@@ -46,6 +46,7 @@ static void usage(const char* me) {
     out.indent();
 
     out << "-f: Force hidl2aidl to convert older packages\n";
+    out << "-e: Used for expanding extensions and types from other packages\n";
     out << "-h: Prints this menu.\n";
     out << "-o <output path>: Location to output files.\n";
     out << "-l <header file>: File containing a header to prepend to generated files.\n";
@@ -172,19 +173,28 @@ static void emitAidlSharedLibs(Formatter& out, FQName fqName, AidlBackend backen
     if (backend == AidlBackend::NDK) {
         out << "        \"libbinder_ndk\",\n";
         out << "        \"libhidlbase\",\n";
-        out << "        \"" << AidlHelper::getAidlPackage(fqName) << "-ndk_platform\",\n";
+        out << "        \"" << AidlHelper::getAidlPackage(fqName) << "-V1-ndk_platform\",\n";
     } else if (backend == AidlBackend::CPP) {
         out << "        \"libbinder\",\n";
         out << "        \"libhidlbase\",\n";
-        out << "        \"" << AidlHelper::getAidlPackage(fqName) << "-cpp\",\n";
+        out << "        \"" << AidlHelper::getAidlPackage(fqName) << "-V1-cpp\",\n";
         out << "        \"libutils\",\n";
+    } else {
+        out << "        \"" << AidlHelper::getAidlPackage(fqName) << "-V1-java\",\n";
     }
 }
 
-static void emitHidlSharedLibs(Formatter& out, std::vector<FQName>& targets) {
+static void emitHidlSharedLibs(Formatter& out, std::vector<FQName>& targets, AidlBackend backend) {
     std::set<std::string> uniquePackages;
     for (const auto& target : targets) {
-        uniquePackages.insert(target.getPackageAndVersion().string());
+        if (backend == AidlBackend::JAVA) {
+            uniquePackages.insert(
+                    android::base::StringReplace(target.getPackageAndVersion().string(), "@", "-V",
+                                                 false /* all */) +
+                    "-java");
+        } else {
+            uniquePackages.insert(target.getPackageAndVersion().string());
+        }
     }
     for (const auto& package : uniquePackages) {
         out << "        \"" << package << "\",\n";
@@ -198,7 +208,7 @@ static std::string aidlTranslateLibraryName(FQName fqName, AidlBackend backend) 
     } else if (backend == AidlBackend::CPP) {
         postfix = "-cpp";
     } else {
-        postfix = "";
+        postfix = "-java";
     }
     return AidlHelper::getAidlPackage(fqName) + "-translate" + postfix;
 }
@@ -240,11 +250,21 @@ static void emitBuildFile(Formatter& out, const FQName& fqName, std::vector<FQNa
         out << "    srcs: [\"" << AidlHelper::translateSourceFile(fqName, backend) + "\"],\n";
         out << "    shared_libs: [\n";
         emitAidlSharedLibs(out, fqName, backend);
-        emitHidlSharedLibs(out, targets);
+        emitHidlSharedLibs(out, targets, backend);
         out << "    ],\n";
         out << "    export_include_dirs: [\"include\"],\n";
         out << "}\n\n";
     }
+
+    out << "java_library {\n";
+    out << "    name: \"" << aidlTranslateLibraryName(fqName, AidlBackend::JAVA) << +"\",\n";
+    out << "    srcs: [\"" << AidlHelper::translateSourceFile(fqName, AidlBackend::JAVA) + "\"],\n";
+    out << "    libs: [\n";
+    emitAidlSharedLibs(out, fqName, AidlBackend::JAVA);
+    emitHidlSharedLibs(out, targets, AidlBackend::JAVA);
+    out << "    ],\n";
+    out << "    sdk_version: \"module_current\",\n";
+    out << "}\n\n";
 }
 
 // hidl is intentionally leaky. Turn off LeakSanitizer by default.
@@ -264,7 +284,7 @@ int main(int argc, char** argv) {
     std::string outputPath;
     std::string fileHeader;
     bool forceConvertOldInterfaces = false;
-    coordinator.parseOptions(argc, argv, "fho:l:", [&](int res, char* arg) {
+    coordinator.parseOptions(argc, argv, "fho:l:e", [&](int res, char* arg) {
         switch (res) {
             case 'o': {
                 if (!outputPath.empty()) {
@@ -283,6 +303,9 @@ int main(int argc, char** argv) {
                 break;
             case 'f':
                 forceConvertOldInterfaces = true;
+                break;
+            case 'e':
+                AidlHelper::setExpandExtended(true);
                 break;
             case 'h':
             case '?':
@@ -389,6 +412,9 @@ int main(int argc, char** argv) {
 
             // Get all of the types defined in the interface chain(includes self)
             for (const Interface* interface : iface->typeChain()) {
+                if (!AidlHelper::shouldBeExpanded(iface->fqName(), interface->fqName())) {
+                    break;
+                }
                 getSubTypes(*interface, &namedTypesInPackage);
             }
         } else {
