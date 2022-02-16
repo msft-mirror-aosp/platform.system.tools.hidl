@@ -19,9 +19,6 @@
 
 package hidl2aidl.test;
 @VintfStability
-parcelable ArrayFoo {
-  byte[] a;
-  int[] b;
-  hidl2aidl.test.Value[] c;
-  String[] d;
+parcelable OuterInner {
+  byte a;
 }

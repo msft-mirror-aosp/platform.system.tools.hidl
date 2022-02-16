@@ -70,7 +70,6 @@ static void emitEnumAidlDefinition(Formatter& out, const EnumType& enumType) {
             out << ",\n";
         };
     });
-    out << "\n";
 }
 
 static void emitCompoundTypeAidlDefinition(
@@ -94,10 +93,6 @@ static void emitCompoundTypeAidlDefinition(
         out << "union " << AidlHelper::getAidlName(compoundType.fqName()) << " ";
     }
     out.block([&] {
-        // Emit all nested type definitions
-        for (auto const& type : processedType.subTypes) {
-            AidlHelper::emitAidl(*type, out, processedTypes);
-        }
         // Emit all of the fields from the processed type
         for (auto const& fieldWithVersion : processedType.fields) {
             fieldWithVersion.field->emitDocComment(out);
@@ -106,12 +101,14 @@ static void emitCompoundTypeAidlDefinition(
             out << aidlType << " " << fieldWithVersion.field->name() << ";\n";
         }
     });
-    out << "\n";
+    out << "\n\n";
 }
 
+// TODO: Enum/Typedef should just emit to hidl-error.log or similar
 void AidlHelper::emitAidl(
-        const NamedType& namedType, Formatter& out,
+        const NamedType& namedType, const Coordinator& coordinator,
         const std::map<const NamedType*, const ProcessedCompoundType>& processedTypes) {
+    Formatter out = getFileWithHeader(namedType, coordinator, processedTypes);
     if (namedType.isTypeDef()) {
         const TypeDef& typeDef = static_cast<const TypeDef&>(namedType);
         emitTypeDefAidlDefinition(out, typeDef);
@@ -123,7 +120,7 @@ void AidlHelper::emitAidl(
         emitEnumAidlDefinition(out, enumType);
     } else if (namedType.isInterface()) {
         const Interface& iface = static_cast<const Interface&>(namedType);
-        emitAidl(iface, out, processedTypes);
+        emitAidl(iface, coordinator, processedTypes);
     } else {
         out << "// TODO: Fix this " << namedType.definedName() << "\n";
     }
