@@ -51,23 +51,12 @@ void AidlHelper::setNotes(Formatter* formatter) {
     notesFormatter = formatter;
 }
 
-std::string AidlHelper::getAidlName(const FQName& fqName, AidlBackend backend) {
+std::string AidlHelper::getAidlName(const FQName& fqName) {
     std::vector<std::string> names;
     for (const std::string& name : fqName.names()) {
         names.push_back(StringHelper::Capitalize(name));
     }
-    switch (backend) {
-        case AidlBackend::CPP:
-            /* fall through */
-        case AidlBackend::NDK:
-            return StringHelper::JoinStrings(names, "::");
-        case AidlBackend::JAVA:
-            return StringHelper::JoinStrings(names, ".");
-        case AidlBackend::UNKNOWN:
-            /* fall through */
-        default:
-            return StringHelper::Capitalize(names.back());
-    }
+    return StringHelper::JoinStrings(names, "");
 }
 
 std::string AidlHelper::getAidlPackage(const FQName& fqName) {
@@ -91,43 +80,23 @@ std::optional<std::string> AidlHelper::getAidlFQName(const FQName& fqName) {
     return getAidlPackage(fqName) + "." + getAidlName(fqName);
 }
 
-const NamedType* AidlHelper::getTopLevelType(const NamedType* type) {
-    if (type->parent() && type->parent()->fqName().hasVersion()) {
-        auto base_type = type->parent();
-        while (base_type->parent() && base_type->parent()->fqName().hasVersion()) {
-            base_type = base_type->parent();
-        }
-        return base_type;
-    } else {
-        return type;
-    }
-}
-
-static void importLocallyReferencedType(const Type& scope, const Type& type,
-                                        std::set<FQName>* imports) {
+void AidlHelper::importLocallyReferencedType(const Type& type, std::set<std::string>* imports) {
     if (type.isArray()) {
-        return importLocallyReferencedType(
-                scope, *static_cast<const ArrayType*>(&type)->getElementType(), imports);
+        return importLocallyReferencedType(*static_cast<const ArrayType*>(&type)->getElementType(),
+                                           imports);
     }
     if (type.isTemplatedType()) {
         return importLocallyReferencedType(
-                scope, *static_cast<const TemplatedType*>(&type)->getElementType(), imports);
+                *static_cast<const TemplatedType*>(&type)->getElementType(), imports);
     }
 
     if (!type.isNamedType()) return;
     const NamedType& namedType = *static_cast<const NamedType*>(&type);
-    // If this type has the same top level type as the scope, then it is defined
-    // in the same file and does not need to be imported.
-    if (scope.isNamedType()) {
-        const auto& scopeTopLevel =
-                AidlHelper::getTopLevelType(static_cast<const NamedType*>(&scope));
-        const auto& thisTopLevel = AidlHelper::getTopLevelType(&namedType);
-        // The fqName might not be equal because of differing HIDL versions for the
-        // top level type. Generated AIDL does not have these differences in
-        // versions, so we can test the equality of the name.
-        if (scopeTopLevel->fqName().name() == thisTopLevel->fqName().name()) return;
+
+    std::optional<std::string> import = AidlHelper::getAidlFQName(namedType.fqName());
+    if (import) {
+        imports->insert(import.value());
     }
-    imports->insert(namedType.fqName());
 }
 
 // This tries iterating over the HIDL AST which is a bit messy because
@@ -140,7 +109,15 @@ void AidlHelper::emitFileHeader(
     AidlHelper::emitFileHeader(out);
     out << "package " << getAidlPackage(type.fqName()) << ";\n\n";
 
-    std::set<FQName> imports;
+    std::set<std::string> imports;
+
+    // Import all the defined types since they will now be in a different file
+    if (type.isScope()) {
+        const Scope& scope = static_cast<const Scope&>(type);
+        for (const NamedType* namedType : scope.getSubTypes()) {
+            importLocallyReferencedType(*namedType, &imports);
+        }
+    }
 
     // Import all the referenced types
     if (type.isInterface()) {
@@ -150,7 +127,7 @@ void AidlHelper::emitFileHeader(
                 getUserDefinedMethods(out, static_cast<const Interface&>(type));
         for (const Method* method : methods) {
             for (const Reference<Type>* ref : method->getReferences()) {
-                importLocallyReferencedType(type, *ref->get(), &imports);
+                importLocallyReferencedType(*ref->get(), &imports);
             }
         }
     } else if (type.isCompoundType()) {
@@ -161,7 +138,10 @@ void AidlHelper::emitFileHeader(
         const ProcessedCompoundType& processedType = it->second;
 
         for (const auto& field : processedType.fields) {
-            importLocallyReferencedType(type, *field.field->get(), &imports);
+            importLocallyReferencedType(*field.field->get(), &imports);
+        }
+        for (const auto& subType : processedType.subTypes) {
+            importLocallyReferencedType(*subType, &imports);
         }
     } else {
         for (const Reference<Type>* ref : type.getReferences()) {
@@ -169,21 +149,12 @@ void AidlHelper::emitFileHeader(
                 // Don't import the referenced type if this is referencing itself
                 continue;
             }
-            importLocallyReferencedType(type, *ref->get(), &imports);
+            importLocallyReferencedType(*ref->get(), &imports);
         }
     }
 
-    const FQName& relativeTo = type.fqName();
-    for (const auto& fqName : imports) {
-        // Import all the defined types since they will now be in a different file.
-        // No need to import types from different packages because they're referenced with FQName.
-        // See AidlHelper::getAidlType()
-        if (getAidlPackage(relativeTo) != getAidlPackage(fqName)) continue;
-
-        std::optional<std::string> import = AidlHelper::getAidlFQName(fqName);
-        if (import) {
-            out << "import " << import.value() << ";\n";
-        }
+    for (const std::string& import : imports) {
+        out << "import " << import << ";\n";
     }
 
     if (imports.size() > 0) {
