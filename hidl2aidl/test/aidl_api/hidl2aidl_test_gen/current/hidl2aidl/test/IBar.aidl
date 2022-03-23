@@ -20,11 +20,7 @@
 package hidl2aidl.test;
 @VintfStability
 interface IBar {
-  void extraMethod(in hidl2aidl.test.IBar.Inner inner);
+  void extraMethod(in hidl2aidl.test.IBarInner inner);
   String someBar(in String a, in byte b);
   oneway void someFoo(in byte a);
-  @VintfStability
-  parcelable Inner {
-    int a;
-  }
 }
