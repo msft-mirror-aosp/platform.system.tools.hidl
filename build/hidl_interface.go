@@ -44,20 +44,20 @@ var (
 	hidlRule = pctx.StaticRule("hidlRule", blueprint.RuleParams{
 		Depfile:     "${depfile}",
 		Deps:        blueprint.DepsGCC,
-		Command:     "rm -rf ${genDir} && ${hidl} -R -p . -d ${depfile} -o ${genDir} -L ${language} ${options} ${fqName}",
+		Command:     "rm -rf ${genDir} && ${hidl} -R -p . -d ${depfile} -o ${genDir} -L ${language} ${roots} ${fqName}",
 		CommandDeps: []string{"${hidl}"},
 		Description: "HIDL ${language}: ${in} => ${out}",
-	}, "depfile", "fqName", "genDir", "language", "options")
+	}, "depfile", "fqName", "genDir", "language", "roots")
 
 	hidlSrcJarRule = pctx.StaticRule("hidlSrcJarRule", blueprint.RuleParams{
 		Depfile: "${depfile}",
 		Deps:    blueprint.DepsGCC,
 		Command: "rm -rf ${genDir} && " +
-			"${hidl} -R -p . -d ${depfile} -o ${genDir}/srcs -L ${language} ${options} ${fqName} && " +
+			"${hidl} -R -p . -d ${depfile} -o ${genDir}/srcs -L ${language} ${roots} ${fqName} && " +
 			"${soong_zip} -o ${genDir}/srcs.srcjar -C ${genDir}/srcs -D ${genDir}/srcs",
 		CommandDeps: []string{"${hidl}", "${soong_zip}"},
 		Description: "HIDL ${language}: ${in} => srcs.srcjar",
-	}, "depfile", "fqName", "genDir", "language", "options")
+	}, "depfile", "fqName", "genDir", "language", "roots")
 
 	vtsRule = pctx.StaticRule("vtsRule", blueprint.RuleParams{
 		Command:     "rm -rf ${genDir} && ${vtsc} -m${mode} -t${type} ${inputDir}/${packagePath} ${genDir}/${packagePath}",
@@ -66,10 +66,10 @@ var (
 	}, "mode", "type", "inputDir", "genDir", "packagePath")
 
 	lintRule = pctx.StaticRule("lintRule", blueprint.RuleParams{
-		Command:     "rm -f ${output} && touch ${output} && ${lint} -j -e -R -p . ${options} ${fqName} > ${output}",
+		Command:     "rm -f ${output} && touch ${output} && ${lint} -j -e -R -p . ${roots} ${fqName} > ${output}",
 		CommandDeps: []string{"${lint}"},
 		Description: "hidl-lint ${fqName}: ${out}",
-	}, "output", "options", "fqName")
+	}, "output", "roots", "fqName")
 
 	zipLintRule = pctx.StaticRule("zipLintRule", blueprint.RuleParams{
 		Command:     "rm -f ${output} && ${soong_zip} -o ${output} -C ${intermediatesDir} ${files}",
@@ -78,10 +78,10 @@ var (
 	}, "output", "files")
 
 	inheritanceHierarchyRule = pctx.StaticRule("inheritanceHierarchyRule", blueprint.RuleParams{
-		Command:     "rm -f ${out} && ${hidl} -L inheritance-hierarchy ${options} ${fqInterface} > ${out}",
+		Command:     "rm -f ${out} && ${hidl} -L inheritance-hierarchy ${roots} ${fqInterface} > ${out}",
 		CommandDeps: []string{"${hidl}"},
 		Description: "HIDL inheritance hierarchy: ${fqInterface} => ${out}",
-	}, "options", "fqInterface")
+	}, "roots", "fqInterface")
 
 	joinJsonObjectsToArrayRule = pctx.StaticRule("joinJsonObjectsToArrayRule", blueprint.RuleParams{
 		Rspfile:        "$out.rsp",
@@ -89,8 +89,6 @@ var (
 		Command: "rm -rf ${out} && " +
 			// Start the output array with an opening bracket.
 			"echo '[' >> ${out} && " +
-			// Add prebuilt declarations
-			"echo \"${extras}\" >> ${out} && " +
 			// Append each input file and a comma to the output.
 			"for file in $$(cat ${out}.rsp); do " +
 			"cat $$file >> ${out}; echo ',' >> ${out}; " +
@@ -98,11 +96,10 @@ var (
 			// Remove the last comma, replacing it with the closing bracket.
 			"sed -i '$$d' ${out} && echo ']' >> ${out}",
 		Description: "Joining JSON objects into array ${out}",
-	}, "extras", "files")
+	}, "files")
 )
 
 func init() {
-	android.RegisterModuleType("prebuilt_hidl_interfaces", prebuiltHidlInterfaceFactory)
 	android.RegisterModuleType("hidl_interface", hidlInterfaceFactory)
 	android.RegisterSingletonType("all_hidl_lints", allHidlLintsFactory)
 	android.RegisterMakeVarsProvider(pctx, makeVarsProvider)
@@ -131,7 +128,6 @@ func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx androi
 	}
 
 	var inheritanceHierarchyOutputs android.Paths
-	additionalInterfaces := []string{}
 	ctx.VisitDirectDeps(func(m android.Module) {
 		if !m.ExportedToMake() {
 			return
@@ -140,8 +136,6 @@ func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx androi
 			if t.properties.Language == "inheritance-hierarchy" {
 				inheritanceHierarchyOutputs = append(inheritanceHierarchyOutputs, t.genOutputs.Paths()...)
 			}
-		} else if t, ok := m.(*prebuiltHidlInterface); ok {
-			additionalInterfaces = append(additionalInterfaces, t.properties.Interfaces...)
 		}
 	})
 
@@ -152,8 +146,7 @@ func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx androi
 		Inputs: inheritanceHierarchyOutputs,
 		Output: m.inheritanceHierarchyPath,
 		Args: map[string]string{
-			"extras": strings.Join(wrap("{\\\"interface\\\":\\\"", additionalInterfaces, "\\\"},"), " "),
-			"files":  strings.Join(inheritanceHierarchyOutputs.Strings(), " "),
+			"files": strings.Join(inheritanceHierarchyOutputs.Strings(), " "),
 		},
 	})
 }
@@ -263,26 +256,24 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		vtsListMutex.Unlock()
 	}
 
-	var extraOptions []string // including roots
+	var fullRootOptions []string
 	var currentPath android.OptionalPath
 	ctx.VisitDirectDeps(func(dep android.Module) {
 		switch t := dep.(type) {
 		case *hidlInterface:
-			extraOptions = append(extraOptions, t.properties.Full_root_option)
+			fullRootOptions = append(fullRootOptions, t.properties.Full_root_option)
 		case *hidlPackageRoot:
 			if currentPath.Valid() {
 				panic(fmt.Sprintf("Expecting only one path, but found %v %v", currentPath, t.getCurrentPath()))
 			}
 
 			currentPath = t.getCurrentPath()
-
-			if t.requireFrozen() {
-				extraOptions = append(extraOptions, "-F")
-			}
+		default:
+			panic(fmt.Sprintf("Unrecognized hidlGenProperties dependency: %T", t))
 		}
 	})
 
-	extraOptions = android.FirstUniqueStrings(extraOptions)
+	fullRootOptions = android.FirstUniqueStrings(fullRootOptions)
 
 	inputs := g.genInputs
 	if currentPath.Valid() {
@@ -300,9 +291,9 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 			Inputs: inputs,
 			Output: g.genOutputs[0],
 			Args: map[string]string{
-				"output":  g.genOutputs[0].String(),
-				"fqName":  g.properties.FqName,
-				"options": strings.Join(extraOptions, " "),
+				"output": g.genOutputs[0].String(),
+				"fqName": g.properties.FqName,
+				"roots":  strings.Join(fullRootOptions, " "),
 			},
 		})
 
@@ -317,7 +308,7 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 				Output: g.genOutputs[i],
 				Args: map[string]string{
 					"fqInterface": g.properties.FqName + "::" + intf,
-					"options":     strings.Join(extraOptions, " "),
+					"roots":       strings.Join(fullRootOptions, " "),
 				},
 			})
 		}
@@ -335,7 +326,7 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 			"genDir":   g.genOutputDir.String(),
 			"fqName":   g.properties.FqName,
 			"language": g.properties.Language,
-			"options":  strings.Join(extraOptions, " "),
+			"roots":    strings.Join(fullRootOptions, " "),
 		},
 	})
 }
@@ -448,33 +439,6 @@ func vtscFactory() android.Module {
 	return g
 }
 
-type prebuiltHidlInterfaceProperties struct {
-	// List of interfaces to consider valid, e.g. "vendor.foo.bar@1.0::IFoo" for typo checking
-	// between init.rc, VINTF, and elsewhere. Note that inheritance properties will not be
-	// checked for these (but would be checked in a branch where the actual hidl_interface
-	// exists).
-	Interfaces []string
-}
-
-type prebuiltHidlInterface struct {
-	android.ModuleBase
-
-	properties prebuiltHidlInterfaceProperties
-}
-
-func (p *prebuiltHidlInterface) GenerateAndroidBuildActions(ctx android.ModuleContext) {}
-
-func (p *prebuiltHidlInterface) DepsMutator(ctx android.BottomUpMutatorContext) {
-	ctx.AddReverseDependency(ctx.Module(), nil, hidlMetadataSingletonName)
-}
-
-func prebuiltHidlInterfaceFactory() android.Module {
-	i := &prebuiltHidlInterface{}
-	i.AddProperties(&i.properties)
-	android.InitAndroidModule(i)
-	return i
-}
-
 type hidlInterfaceProperties struct {
 	// Vndk properties for interface library only.
 	cc.VndkProperties
@@ -505,6 +469,10 @@ type hidlInterfaceProperties struct {
 	// example: -randroid.hardware:hardware/interfaces
 	Full_root_option string `blueprint:"mutated"`
 
+	// Whether this interface library should be installed on product partition.
+	// TODO(b/150902910): remove, since this should be an inherited property.
+	Product_specific *bool
+
 	// List of APEX modules this interface can be used in.
 	//
 	// WARNING: HIDL is not fully supported in APEX since VINTF currently doesn't
@@ -517,10 +485,6 @@ type hidlInterfaceProperties struct {
 	// does  not apply to VTS targets/adapter targets/fuzzers since these components
 	// should not be shipped on device.
 	Apex_available []string
-
-	// Installs the vendor variant of the module to the /odm partition instead of
-	// the /vendor partition.
-	Odm_available *bool
 }
 
 type hidlInterface struct {
@@ -588,11 +552,6 @@ func removeCoreDependencies(mctx android.LoadHookContext, dependencies []string)
 }
 
 func hidlInterfaceMutator(mctx android.LoadHookContext, i *hidlInterface) {
-	if !canInterfaceExist(i.ModuleBase.Name()) {
-		mctx.PropertyErrorf("name", "No more HIDL interfaces can be added to Android. Please use AIDL.")
-		return
-	}
-
 	name, err := parseFqName(i.ModuleBase.Name())
 	if err != nil {
 		mctx.PropertyErrorf("name", err.Error())
@@ -636,19 +595,8 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 	shouldGenerateJavaConstants := i.properties.Gen_java_constants
 	shouldGenerateVts := shouldGenerateLibrary && proptools.BoolDefault(i.properties.Gen_vts, true)
 
-	// To generate VTS, hidl_interface must have a core variant.
-	// A module with 'product_specific: true' does not create a core variant.
-	shouldGenerateVts = shouldGenerateVts && !mctx.ProductSpecific()
-
-	var productAvailable *bool
-	if !mctx.ProductSpecific() {
-		productAvailable = proptools.BoolPtr(true)
-	}
-
-	var vendorAvailable *bool
-	if !proptools.Bool(i.properties.Odm_available) {
-		vendorAvailable = proptools.BoolPtr(true)
-	}
+	// TODO(b/150902910): re-enable VTS builds for product things
+	shouldGenerateVts = shouldGenerateVts && !proptools.Bool(i.properties.Product_specific)
 
 	var libraryIfExists []string
 	if shouldGenerateLibrary {
@@ -693,9 +641,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Name:               proptools.StringPtr(name.string()),
 			Host_supported:     proptools.BoolPtr(true),
 			Recovery_available: proptools.BoolPtr(true),
-			Vendor_available:   vendorAvailable,
-			Odm_available:      i.properties.Odm_available,
-			Product_available:  productAvailable,
+			Vendor_available:   proptools.BoolPtr(true),
 			Double_loadable:    proptools.BoolPtr(isDoubleLoadable(name.string())),
 			Defaults:           []string{"hidl-module-defaults"},
 			Generated_sources:  []string{name.sourcesName()},
@@ -797,9 +743,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 
 	mctx.CreateModule(cc.LibraryFactory, &ccProperties{
 		Name:              proptools.StringPtr(name.adapterHelperName()),
-		Vendor_available:  vendorAvailable,
-		Odm_available:     i.properties.Odm_available,
-		Product_available: productAvailable,
+		Vendor_available:  proptools.BoolPtr(true),
 		Defaults:          []string{"hidl-module-defaults"},
 		Generated_sources: []string{name.adapterHelperSourcesName()},
 		Generated_headers: []string{name.adapterHelperHeadersName()},
@@ -971,13 +915,11 @@ func (h *hidlInterface) Name() string {
 func (h *hidlInterface) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	visited := false
 	ctx.VisitDirectDeps(func(dep android.Module) {
-		if r, ok := dep.(*hidlPackageRoot); ok {
-			if visited {
-				panic("internal error, multiple dependencies found but only one added")
-			}
-			visited = true
-			h.properties.Full_root_option = r.getFullPackageRoot()
+		if visited {
+			panic("internal error, multiple dependencies found but only one added")
 		}
+		visited = true
+		h.properties.Full_root_option = dep.(*hidlPackageRoot).getFullPackageRoot()
 	})
 	if !visited {
 		panic("internal error, no dependencies found but dependency added")
@@ -998,7 +940,6 @@ func hidlInterfaceFactory() android.Module {
 }
 
 var minSdkVersion = map[string]string{
-	"android.frameworks.bufferhub@1.0":          "29",
 	"android.hardware.audio.common@5.0":         "30",
 	"android.hardware.bluetooth.a2dp@1.0":       "30",
 	"android.hardware.bluetooth.audio@2.0":      "30",
@@ -1021,7 +962,6 @@ var minSdkVersion = map[string]string{
 	"android.hardware.media.bufferpool@2.0":     "29",
 	"android.hardware.media.c2@1.0":             "29",
 	"android.hardware.media.c2@1.1":             "29",
-	"android.hardware.media.c2@1.2":             "29",
 	"android.hardware.media.omx@1.0":            "29",
 	"android.hardware.media@1.0":                "29",
 	"android.hardware.neuralnetworks@1.0":       "30",
@@ -1033,16 +973,13 @@ var minSdkVersion = map[string]string{
 	"android.hardware.wifi@1.2":                 "30",
 	"android.hardware.wifi@1.3":                 "30",
 	"android.hardware.wifi@1.4":                 "30",
-	"android.hardware.wifi@1.5":                 "30",
 	"android.hardware.wifi.hostapd@1.0":         "30",
 	"android.hardware.wifi.hostapd@1.1":         "30",
 	"android.hardware.wifi.hostapd@1.2":         "30",
-	"android.hardware.wifi.hostapd@1.3":         "30",
 	"android.hardware.wifi.supplicant@1.0":      "30",
 	"android.hardware.wifi.supplicant@1.1":      "30",
 	"android.hardware.wifi.supplicant@1.2":      "30",
 	"android.hardware.wifi.supplicant@1.3":      "30",
-	"android.hardware.wifi.supplicant@1.4":      "30",
 	"android.hidl.allocator@1.0":                "29",
 	"android.hidl.manager@1.0":                  "30",
 	"android.hidl.manager@1.1":                  "30",
@@ -1105,18 +1042,15 @@ func isCorePackage(name string) bool {
 
 var fuzzerPackageNameBlacklist = []string{
 	"android.hardware.keymaster@", // to avoid deleteAllKeys()
-	// Same-process HALs are always opened in the same process as their client.
-	// So stability guarantees don't apply to them, e.g. it's OK to crash on
-	// NULL input from client. Disable corresponding fuzzers as they create too
-	// much noise.
-	"android.hardware.graphics.mapper@",
-	"android.hardware.renderscript@",
-	"android.hidl.memory@",
 }
 
 func isFuzzerEnabled(name string) bool {
-	// TODO(151338797): re-enable fuzzers
-	return false
+	for _, pkgname := range fuzzerPackageNameBlacklist {
+		if strings.HasPrefix(name, pkgname) {
+			return false
+		}
+	}
+	return true
 }
 
 // TODO(b/126383715): centralize this logic/support filtering in core VTS build
@@ -1151,255 +1085,4 @@ func makeVarsProvider(ctx android.MakeVarsContext) {
 	sort.Strings(vtsList)
 
 	ctx.Strict("VTS_SPEC_FILE_LIST", strings.Join(vtsList, " "))
-}
-
-func canInterfaceExist(name string) bool {
-	if strings.HasPrefix(name, "android.") {
-		return allAospHidlInterfaces[name]
-	}
-
-	return true
-}
-
-var allAospHidlInterfaces = map[string]bool{
-	"android.frameworks.automotive.display@1.0":         true,
-	"android.frameworks.bufferhub@1.0":                  true,
-	"android.frameworks.cameraservice.common@2.0":       true,
-	"android.frameworks.cameraservice.device@2.0":       true,
-	"android.frameworks.cameraservice.device@2.1":       true,
-	"android.frameworks.cameraservice.service@2.0":      true,
-	"android.frameworks.cameraservice.service@2.1":      true,
-	"android.frameworks.cameraservice.service@2.2":      true,
-	"android.frameworks.displayservice@1.0":             true,
-	"android.frameworks.schedulerservice@1.0":           true,
-	"android.frameworks.sensorservice@1.0":              true,
-	"android.frameworks.stats@1.0":                      true,
-	"android.frameworks.vr.composer@1.0":                true,
-	"android.frameworks.vr.composer@2.0":                true,
-	"android.hardware.atrace@1.0":                       true,
-	"android.hardware.audio@2.0":                        true,
-	"android.hardware.audio@4.0":                        true,
-	"android.hardware.audio@5.0":                        true,
-	"android.hardware.audio@6.0":                        true,
-	"android.hardware.audio@7.0":                        true,
-	"android.hardware.audio.common@2.0":                 true,
-	"android.hardware.audio.common@4.0":                 true,
-	"android.hardware.audio.common@5.0":                 true,
-	"android.hardware.audio.common@6.0":                 true,
-	"android.hardware.audio.common@7.0":                 true,
-	"android.hardware.audio.effect@2.0":                 true,
-	"android.hardware.audio.effect@4.0":                 true,
-	"android.hardware.audio.effect@5.0":                 true,
-	"android.hardware.audio.effect@6.0":                 true,
-	"android.hardware.audio.effect@7.0":                 true,
-	"android.hardware.authsecret@1.0":                   true,
-	"android.hardware.automotive.audiocontrol@1.0":      true,
-	"android.hardware.automotive.audiocontrol@2.0":      true,
-	"android.hardware.automotive.can@1.0":               true,
-	"android.hardware.automotive.evs@1.0":               true,
-	"android.hardware.automotive.evs@1.1":               true,
-	"android.hardware.automotive.sv@1.0":                true,
-	"android.hardware.automotive.vehicle@2.0":           true,
-	"android.hardware.biometrics.face@1.0":              true,
-	"android.hardware.biometrics.fingerprint@2.1":       true,
-	"android.hardware.biometrics.fingerprint@2.2":       true,
-	"android.hardware.biometrics.fingerprint@2.3":       true,
-	"android.hardware.bluetooth@1.0":                    true,
-	"android.hardware.bluetooth@1.1":                    true,
-	"android.hardware.bluetooth.a2dp@1.0":               true,
-	"android.hardware.bluetooth.audio@2.0":              true,
-	"android.hardware.bluetooth.audio@2.1":              true,
-	"android.hardware.boot@1.0":                         true,
-	"android.hardware.boot@1.1":                         true,
-	"android.hardware.boot@1.2":                         true,
-	"android.hardware.broadcastradio@1.0":               true,
-	"android.hardware.broadcastradio@1.1":               true,
-	"android.hardware.broadcastradio@2.0":               true,
-	"android.hardware.camera.common@1.0":                true,
-	"android.hardware.camera.device@1.0":                true,
-	"android.hardware.camera.device@3.2":                true,
-	"android.hardware.camera.device@3.3":                true,
-	"android.hardware.camera.device@3.4":                true,
-	"android.hardware.camera.device@3.5":                true,
-	"android.hardware.camera.device@3.6":                true,
-	"android.hardware.camera.device@3.7":                true,
-	"android.hardware.camera.metadata@3.2":              true,
-	"android.hardware.camera.metadata@3.3":              true,
-	"android.hardware.camera.metadata@3.4":              true,
-	"android.hardware.camera.metadata@3.5":              true,
-	"android.hardware.camera.metadata@3.6":              true,
-	"android.hardware.camera.provider@2.4":              true,
-	"android.hardware.camera.provider@2.5":              true,
-	"android.hardware.camera.provider@2.6":              true,
-	"android.hardware.camera.provider@2.7":              true,
-	"android.hardware.cas@1.0":                          true,
-	"android.hardware.cas@1.1":                          true,
-	"android.hardware.cas@1.2":                          true,
-	"android.hardware.cas.native@1.0":                   true,
-	"android.hardware.configstore@1.0":                  true,
-	"android.hardware.configstore@1.1":                  true,
-	"android.hardware.confirmationui@1.0":               true,
-	"android.hardware.contexthub@1.0":                   true,
-	"android.hardware.contexthub@1.1":                   true,
-	"android.hardware.contexthub@1.2":                   true,
-	"android.hardware.drm@1.0":                          true,
-	"android.hardware.drm@1.1":                          true,
-	"android.hardware.drm@1.2":                          true,
-	"android.hardware.drm@1.3":                          true,
-	"android.hardware.drm@1.4":                          true,
-	"android.hardware.dumpstate@1.0":                    true,
-	"android.hardware.dumpstate@1.1":                    true,
-	"android.hardware.fastboot@1.0":                     true,
-	"android.hardware.fastboot@1.1":                     true,
-	"android.hardware.gatekeeper@1.0":                   true,
-	"android.hardware.gnss@1.0":                         true,
-	"android.hardware.gnss@1.1":                         true,
-	"android.hardware.gnss@2.0":                         true,
-	"android.hardware.gnss@2.1":                         true,
-	"android.hardware.gnss.measurement_corrections@1.0": true,
-	"android.hardware.gnss.measurement_corrections@1.1": true,
-	"android.hardware.gnss.visibility_control@1.0":      true,
-	"android.hardware.graphics.allocator@2.0":           true,
-	"android.hardware.graphics.allocator@3.0":           true,
-	"android.hardware.graphics.allocator@4.0":           true,
-	"android.hardware.graphics.bufferqueue@1.0":         true,
-	"android.hardware.graphics.bufferqueue@2.0":         true,
-	"android.hardware.graphics.common@1.0":              true,
-	"android.hardware.graphics.common@1.1":              true,
-	"android.hardware.graphics.common@1.2":              true,
-	"android.hardware.graphics.composer@2.1":            true,
-	"android.hardware.graphics.composer@2.2":            true,
-	"android.hardware.graphics.composer@2.3":            true,
-	"android.hardware.graphics.composer@2.4":            true,
-	"android.hardware.graphics.mapper@2.0":              true,
-	"android.hardware.graphics.mapper@2.1":              true,
-	"android.hardware.graphics.mapper@3.0":              true,
-	"android.hardware.graphics.mapper@4.0":              true,
-	"android.hardware.health@1.0":                       true,
-	"android.hardware.health@2.0":                       true,
-	"android.hardware.health@2.1":                       true,
-	"android.hardware.health.storage@1.0":               true,
-	"android.hardware.input.classifier@1.0":             true,
-	"android.hardware.input.common@1.0":                 true,
-	"android.hardware.ir@1.0":                           true,
-	"android.hardware.keymaster@3.0":                    true,
-	"android.hardware.keymaster@4.0":                    true,
-	"android.hardware.keymaster@4.1":                    true,
-	"android.hardware.light@2.0":                        true,
-	"android.hardware.media@1.0":                        true,
-	"android.hardware.media.bufferpool@1.0":             true,
-	"android.hardware.media.bufferpool@2.0":             true,
-	"android.hardware.media.c2@1.0":                     true,
-	"android.hardware.media.c2@1.1":                     true,
-	"android.hardware.media.c2@1.2":                     true,
-	"android.hardware.media.omx@1.0":                    true,
-	"android.hardware.memtrack@1.0":                     true,
-	"android.hardware.neuralnetworks@1.0":               true,
-	"android.hardware.neuralnetworks@1.1":               true,
-	"android.hardware.neuralnetworks@1.2":               true,
-	"android.hardware.neuralnetworks@1.3":               true,
-	"android.hardware.nfc@1.0":                          true,
-	"android.hardware.nfc@1.1":                          true,
-	"android.hardware.nfc@1.2":                          true,
-	"android.hardware.oemlock@1.0":                      true,
-	"android.hardware.power@1.0":                        true,
-	"android.hardware.power@1.1":                        true,
-	"android.hardware.power@1.2":                        true,
-	"android.hardware.power@1.3":                        true,
-	"android.hardware.power.stats@1.0":                  true,
-	"android.hardware.radio@1.0":                        true,
-	"android.hardware.radio@1.1":                        true,
-	"android.hardware.radio@1.2":                        true,
-	"android.hardware.radio@1.3":                        true,
-	"android.hardware.radio@1.4":                        true,
-	"android.hardware.radio@1.5":                        true,
-	"android.hardware.radio@1.6":                        true,
-	"android.hardware.radio.config@1.0":                 true,
-	"android.hardware.radio.config@1.1":                 true,
-	"android.hardware.radio.config@1.2":                 true,
-	"android.hardware.radio.config@1.3":                 true,
-	"android.hardware.radio.deprecated@1.0":             true,
-	"android.hardware.renderscript@1.0":                 true,
-	"android.hardware.secure_element@1.0":               true,
-	"android.hardware.secure_element@1.1":               true,
-	"android.hardware.secure_element@1.2":               true,
-	"android.hardware.sensors@1.0":                      true,
-	"android.hardware.sensors@2.0":                      true,
-	"android.hardware.sensors@2.1":                      true,
-	"android.hardware.soundtrigger@2.0":                 true,
-	"android.hardware.soundtrigger@2.1":                 true,
-	"android.hardware.soundtrigger@2.2":                 true,
-	"android.hardware.soundtrigger@2.3":                 true,
-	"android.hardware.soundtrigger@2.4":                 true,
-	"android.hardware.tests.bar@1.0":                    true,
-	"android.hardware.tests.baz@1.0":                    true,
-	"android.hardware.tests.expression@1.0":             true,
-	"android.hardware.tests.extension.light@2.0":        true,
-	"android.hardware.tests.foo@1.0":                    true,
-	"android.hardware.tests.hash@1.0":                   true,
-	"android.hardware.tests.inheritance@1.0":            true,
-	"android.hardware.tests.lazy@1.0":                   true,
-	"android.hardware.tests.lazy@1.1":                   true,
-	"android.hardware.tests.libhwbinder@1.0":            true,
-	"android.hardware.tests.memory@1.0":                 true,
-	"android.hardware.tests.memory@2.0":                 true,
-	"android.hardware.tests.msgq@1.0":                   true,
-	"android.hardware.tests.multithread@1.0":            true,
-	"android.hardware.tests.safeunion@1.0":              true,
-	"android.hardware.tests.safeunion.cpp@1.0":          true,
-	"android.hardware.tests.trie@1.0":                   true,
-	"android.hardware.tetheroffload.config@1.0":         true,
-	"android.hardware.tetheroffload.control@1.0":        true,
-	"android.hardware.tetheroffload.control@1.1":        true,
-	"android.hardware.thermal@1.0":                      true,
-	"android.hardware.thermal@1.1":                      true,
-	"android.hardware.thermal@2.0":                      true,
-	"android.hardware.tv.cec@1.0":                       true,
-	"android.hardware.tv.cec@1.1":                       true,
-	"android.hardware.tv.input@1.0":                     true,
-	"android.hardware.tv.tuner@1.0":                     true,
-	"android.hardware.tv.tuner@1.1":                     true,
-	"android.hardware.usb@1.0":                          true,
-	"android.hardware.usb@1.1":                          true,
-	"android.hardware.usb@1.2":                          true,
-	"android.hardware.usb@1.3":                          true,
-	"android.hardware.usb.gadget@1.0":                   true,
-	"android.hardware.usb.gadget@1.1":                   true,
-	"android.hardware.usb.gadget@1.2":                   true,
-	"android.hardware.vibrator@1.0":                     true,
-	"android.hardware.vibrator@1.1":                     true,
-	"android.hardware.vibrator@1.2":                     true,
-	"android.hardware.vibrator@1.3":                     true,
-	"android.hardware.vr@1.0":                           true,
-	"android.hardware.weaver@1.0":                       true,
-	"android.hardware.wifi@1.0":                         true,
-	"android.hardware.wifi@1.1":                         true,
-	"android.hardware.wifi@1.2":                         true,
-	"android.hardware.wifi@1.3":                         true,
-	"android.hardware.wifi@1.4":                         true,
-	"android.hardware.wifi@1.5":                         true,
-	"android.hardware.wifi.hostapd@1.0":                 true,
-	"android.hardware.wifi.hostapd@1.1":                 true,
-	"android.hardware.wifi.hostapd@1.2":                 true,
-	"android.hardware.wifi.hostapd@1.3":                 true,
-	"android.hardware.wifi.offload@1.0":                 true,
-	"android.hardware.wifi.supplicant@1.0":              true,
-	"android.hardware.wifi.supplicant@1.1":              true,
-	"android.hardware.wifi.supplicant@1.2":              true,
-	"android.hardware.wifi.supplicant@1.3":              true,
-	"android.hardware.wifi.supplicant@1.4":              true,
-	"android.hidl.allocator@1.0":                        true,
-	"android.hidl.base@1.0":                             true,
-	"android.hidl.manager@1.0":                          true,
-	"android.hidl.manager@1.1":                          true,
-	"android.hidl.manager@1.2":                          true,
-	"android.hidl.memory@1.0":                           true,
-	"android.hidl.memory.block@1.0":                     true,
-	"android.hidl.memory.token@1.0":                     true,
-	"android.hidl.safe_union@1.0":                       true,
-	"android.hidl.token@1.0":                            true,
-	"android.system.net.netd@1.0":                       true,
-	"android.system.net.netd@1.1":                       true,
-	"android.system.suspend@1.0":                        true,
-	"android.system.wifi.keystore@1.0":                  true,
 }

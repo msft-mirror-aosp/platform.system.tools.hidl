@@ -74,7 +74,6 @@ struct EnumType : public Scope {
 
     status_t resolveInheritance() override;
     status_t validate() const override;
-    status_t validateAnnotations() const override;
     status_t validateUniqueNames() const;
 
     void emitJavaFieldInitializer(Formatter&, const std::string&) const override;
@@ -122,9 +121,8 @@ struct EnumType : public Scope {
 
     void emitExportedHeader(Formatter& out, bool forJava) const override;
 
+   private:
     std::vector<const EnumType*> typeChain() const;
-
-  private:
     std::vector<const EnumType*> superTypeChain() const;
 
     const Annotation *findExportAnnotation() const;

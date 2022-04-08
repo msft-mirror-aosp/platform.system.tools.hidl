@@ -168,8 +168,10 @@ private:
     void emitSafeUnionUnknownDiscriminatorError(Formatter& out, const std::string& value,
                                                 bool fatal) const;
 
-    void emitSafeUnionAssignDefinition(Formatter& out, const std::string& parameterName,
-                                       bool usesMoveSemantics) const;
+    void emitSafeUnionCopyAndAssignDefinition(Formatter& out,
+                                              const std::string& parameterName,
+                                              bool isCopyConstructor,
+                                              bool usesMoveSemantics) const;
 
     CompoundLayout getCompoundAlignmentAndSize() const;
     void emitPaddingZero(Formatter& out, size_t offset, size_t size) const;
