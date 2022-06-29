@@ -724,7 +724,6 @@ func hidlInterfaceFactory() android.Module {
 }
 
 var minSdkVersion = map[string]string{
-	"android.frameworks.bufferhub@1.0":             "29",
 	"android.hardware.audio.common@5.0":            "30",
 	"android.hardware.audio.common@6.0":            "31",
 	"android.hardware.automotive.audiocontrol@1.0": "31",
@@ -736,28 +735,8 @@ var minSdkVersion = map[string]string{
 	"android.hardware.bluetooth.audio@2.2":         "30",
 	"android.hardware.bluetooth@1.0":               "30",
 	"android.hardware.bluetooth@1.1":               "30",
-	"android.hardware.cas.native@1.0":              "29",
-	"android.hardware.cas@1.0":                     "29",
-	"android.hardware.graphics.allocator@2.0":      "29",
-	"android.hardware.graphics.allocator@3.0":      "29",
-	"android.hardware.graphics.allocator@4.0":      "29",
-	"android.hardware.graphics.bufferqueue@1.0":    "29",
-	"android.hardware.graphics.bufferqueue@2.0":    "29",
-	"android.hardware.graphics.common@1.0":         "29",
-	"android.hardware.graphics.common@1.1":         "29",
-	"android.hardware.graphics.common@1.2":         "29",
-	"android.hardware.graphics.mapper@2.0":         "29",
-	"android.hardware.graphics.mapper@2.1":         "29",
-	"android.hardware.graphics.mapper@3.0":         "29",
-	"android.hardware.graphics.mapper@4.0":         "29",
 	"android.hardware.health@1.0":                  "31",
 	"android.hardware.health@2.0":                  "31",
-	"android.hardware.media.bufferpool@2.0":        "29",
-	"android.hardware.media.c2@1.0":                "29",
-	"android.hardware.media.c2@1.1":                "29",
-	"android.hardware.media.c2@1.2":                "29",
-	"android.hardware.media.omx@1.0":               "29",
-	"android.hardware.media@1.0":                   "29",
 	"android.hardware.neuralnetworks@1.0":          "30",
 	"android.hardware.neuralnetworks@1.1":          "30",
 	"android.hardware.neuralnetworks@1.2":          "30",
@@ -778,21 +757,25 @@ var minSdkVersion = map[string]string{
 	"android.hardware.wifi.supplicant@1.2":         "30",
 	"android.hardware.wifi.supplicant@1.3":         "30",
 	"android.hardware.wifi.supplicant@1.4":         "30",
-	"android.hidl.allocator@1.0":                   "29",
 	"android.hidl.manager@1.0":                     "30",
 	"android.hidl.manager@1.1":                     "30",
 	"android.hidl.manager@1.2":                     "30",
-	"android.hidl.memory.token@1.0":                "29",
-	"android.hidl.memory@1.0":                      "29",
-	"android.hidl.safe_union@1.0":                  "29",
-	"android.hidl.token@1.0":                       "29",
 }
 
 func getMinSdkVersion(name string) *string {
 	if ver, ok := minSdkVersion[name]; ok {
 		return proptools.StringPtr(ver)
 	}
-	return nil
+	// legacy, as used
+	if name == "android.hardware.tetheroffload.config@1.0" ||
+		name == "android.hardware.tetheroffload.control@1.0" ||
+		name == "android.hardware.tetheroffload.control@1.1" ||
+		name == "android.hardware.radio@1.0" ||
+		name == "android.hidl.base@1.0" {
+
+		return nil
+	}
+	return proptools.StringPtr("29")
 }
 
 var doubleLoadablePackageNames = []string{
