@@ -63,7 +63,9 @@ var (
 	}, "output", "options", "fqName")
 
 	zipLintRule = pctx.StaticRule("zipLintRule", blueprint.RuleParams{
-		Command:     "rm -f ${output} && ${soong_zip} -o ${output} -C ${intermediatesDir} ${files}",
+		Rspfile:     "$out.rsp",
+		RspfileContent: "$files",
+		Command:     "rm -f ${output} && ${soong_zip} -o ${output} -C ${intermediatesDir} -l ${out}.rsp",
 		CommandDeps: []string{"${soong_zip}"},
 		Description: "Zipping hidl-lints into ${output}",
 	}, "output", "files")
@@ -187,7 +189,7 @@ func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContex
 		Output: outPath,
 		Args: map[string]string{
 			"output": outPath.String(),
-			"files":  strings.Join(wrap("-f ", hidlLintOutputs.Strings(), ""), " "),
+			"files":  strings.Join(hidlLintOutputs.Strings(), " "),
 		},
 	})
 }
