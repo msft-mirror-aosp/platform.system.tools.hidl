@@ -64,11 +64,11 @@ var (
 	}, "output", "options", "fqName")
 
 	zipLintRule = pctx.StaticRule("zipLintRule", blueprint.RuleParams{
-		Rspfile:     "$out.rsp",
+		Rspfile:        "$out.rsp",
 		RspfileContent: "$files",
-		Command:     "rm -f ${output} && ${soong_zip} -o ${output} -C ${intermediatesDir} -l ${out}.rsp",
-		CommandDeps: []string{"${soong_zip}"},
-		Description: "Zipping hidl-lints into ${output}",
+		Command:        "rm -f ${output} && ${soong_zip} -o ${output} -C ${intermediatesDir} -l ${out}.rsp",
+		CommandDeps:    []string{"${soong_zip}"},
+		Description:    "Zipping hidl-lints into ${output}",
 	}, "output", "files")
 
 	inheritanceHierarchyRule = pctx.StaticRule("inheritanceHierarchyRule", blueprint.RuleParams{
@@ -779,6 +779,9 @@ func (m *hidlInterface) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
 			} else {
 				path = ctx.OtherModuleDir(pkg_root)
 			}
+			// The root and root_interface come from the hidl_package_root module that
+			// this module depends on, we don't convert hidl_package_root module
+			// separately since all the other properties of that module are deprecated.
 			root = pkg_root.Name()
 			if path == ctx.ModuleDir() {
 				root_interface_file = *bazel.MakeLabelAttribute(":" + "current.txt")
