@@ -1273,7 +1273,7 @@ public final class HidlTestJava {
         }
 
         public IBase.Foo[] someMethodWithFooArrays(IBase.Foo[] fooInput) {
-            Log.d(TAG, "Baz someMethodWithFooArrays " + fooInput.toString());
+            Log.d(TAG, "Baz someMethodWithFooArrays " + Arrays.toString(fooInput));
 
             IBase.Foo[] fooOutput = new IBase.Foo[2];
             fooOutput[0] = fooInput[1];
@@ -1333,7 +1333,7 @@ public final class HidlTestJava {
         }
 
         public String[][] transpose2(String[][] in) {
-            Log.d(TAG, "Baz transpose2 " + in.toString());
+            Log.d(TAG, "Baz transpose2 " + Arrays.deepToString(in));
 
             String[][] out = new String[3][5];
             for (int i = 0; i < 3; ++i) {
@@ -1352,8 +1352,7 @@ public final class HidlTestJava {
         }
 
         public boolean[] someBoolArrayMethod(boolean[] x) {
-            Log.d(TAG, "Baz someBoolArrayMethod("
-                    + x.toString() + ")");
+            Log.d(TAG, "Baz someBoolArrayMethod(" + Arrays.toString(x) + ")");
 
             boolean[] out = new boolean[4];
             out[0] = !x[0];
@@ -1390,7 +1389,7 @@ public final class HidlTestJava {
         }
 
         public int[] doSomethingElse(int[] param) {
-            Log.d(TAG, "Baz doSomethingElse " + param.toString());
+            Log.d(TAG, "Baz doSomethingElse " + Arrays.toString(param));
 
             int[] something = new int[32];
             for (int i = 0; i < 15; ++i) {
@@ -1566,7 +1565,7 @@ public final class HidlTestJava {
 
         @Override
         public LargeSafeUnion setE(LargeSafeUnion safeUnion, byte[/* 13 */] e) {
-            Log.d(TAG, "SERVER: setE(" + e + ")");
+            Log.d(TAG, "SERVER: setE(" + Arrays.toString(e) + ")");
             safeUnion.e(e);
 
             return safeUnion;
@@ -1574,7 +1573,7 @@ public final class HidlTestJava {
 
         @Override
         public LargeSafeUnion setF(LargeSafeUnion safeUnion, long[/* 5 */] f) {
-            Log.d(TAG, "SERVER: setF(" + f + ")");
+            Log.d(TAG, "SERVER: setF(" + Arrays.toString(f) + ")");
             safeUnion.f(f);
 
             return safeUnion;
@@ -1661,7 +1660,7 @@ public final class HidlTestJava {
         @Override
         public InterfaceTypeSafeUnion setInterfaceB(
             InterfaceTypeSafeUnion safeUnion, byte[/* 7 */] b) {
-            Log.d(TAG, "SERVER: setInterfaceB(" + b + ")");
+            Log.d(TAG, "SERVER: setInterfaceB(" + Arrays.toString(b) + ")");
             safeUnion.b(b);
 
             return safeUnion;
@@ -1727,7 +1726,7 @@ public final class HidlTestJava {
 
         @Override
         public HandleTypeSafeUnion setHandleB(HandleTypeSafeUnion safeUnion, NativeHandle[] b) {
-            Log.d(TAG, "SERVER: setHandleB(" + b + ")");
+            Log.d(TAG, "SERVER: setHandleB(" + Arrays.toString(b) + ")");
             safeUnion.b(b);
 
             return safeUnion;
