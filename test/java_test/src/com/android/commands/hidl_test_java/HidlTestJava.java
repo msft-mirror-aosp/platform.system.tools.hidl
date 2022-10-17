@@ -930,8 +930,7 @@ public final class HidlTestJava {
             ExpectTrue(java.util.Objects.deepEquals(outArray, expectedOutArray));
 
             ArrayList<Integer> outVec = proxy.mapThisVector(paramVec);
-            java.util.Objects.equals(outVec, expectedOutVec);
-
+            ExpectTrue(java.util.Objects.equals(outVec, expectedOutVec));
         }
 
         Expect(proxy.doStuffAndReturnAString(), "Hello, world!");
@@ -1421,8 +1420,7 @@ public final class HidlTestJava {
 
         public void takeAMask(byte bf, byte first, IBase.MyMask second, byte third,
                 takeAMaskCallback cb) {
-            cb.onValues(bf, (byte)(bf | first),
-                    (byte)(second.value & bf), (byte)((bf | bf) & third));
+            cb.onValues(bf, (byte) (bf | first), (byte) (second.value & bf), (byte) (bf & third));
         }
 
         public LotsOfPrimitiveArrays testArrays(LotsOfPrimitiveArrays in) {
