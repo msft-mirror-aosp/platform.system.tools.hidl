@@ -232,7 +232,7 @@ static void emitBuildFile(Formatter& out, const FQName& fqName, std::vector<FQNa
     out << "            enabled: true,\n";
     out << "        },\n";
     out << "        java: {\n";
-    out << "            sdk_version: \"module_current\",\n";
+    out << "            sdk_version: \"system_current\",\n";
     out << "        },\n";
     out << "    },\n";
     out << "}\n\n";
@@ -261,7 +261,7 @@ static void emitBuildFile(Formatter& out, const FQName& fqName, std::vector<FQNa
     emitAidlSharedLibs(out, fqName, AidlBackend::JAVA);
     emitHidlSharedLibs(out, targets, AidlBackend::JAVA);
     out << "    ],\n";
-    out << "    sdk_version: \"module_current\",\n";
+    out << "    sdk_version: \"system_current\",\n";
     out << "}\n\n";
 }
 
