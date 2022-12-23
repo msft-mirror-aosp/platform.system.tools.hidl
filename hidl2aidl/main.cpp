@@ -221,7 +221,6 @@ static void emitBuildFile(Formatter& out, const FQName& fqName, std::vector<FQNa
     out << "    name: \"" << AidlHelper::getAidlPackage(fqName) << "\",\n";
     out << "    vendor_available: true,\n";
     out << "    host_supported: true,\n";
-    out << "    frozen: false,\n";
     out << "    srcs: [\"" << AidlHelper::getAidlPackagePath(fqName) << "/*.aidl\"],\n";
     out << "    stability: \"vintf\",\n";
     out << "    backend: {\n";
