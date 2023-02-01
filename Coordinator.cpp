@@ -472,8 +472,8 @@ status_t Coordinator::getPackageInterfaceFiles(
             if ((sb.st_mode & S_IFMT) != S_IFREG) {
                 continue;
             }
-        } else if (ent->d_type != DT_REG) {
-             continue;
+        } else if (ent->d_type != DT_REG && ent->d_type != DT_LNK) {
+            continue;
         }
 
         const auto suffix = ".hal";
