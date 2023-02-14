@@ -1042,6 +1042,10 @@ void Coordinator::parseOptions(int argc, char** argv, const std::string& options
             // something downstream should handle these cases
             default: { handleArg(res, optarg); }
         }
+        // glibc sets optarg to NULL for options without an argument, but POSIX doesn't
+        // require it musl libc does not.  Reset it here so that the next call to
+        // handleArg doesn't pass a stale value.
+        optarg = nullptr;
     }
 
     if (getRootPath().empty()) {
