@@ -798,7 +798,7 @@ func (m *hidlInterface) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
 		Root:                root,
 		Root_interface_file: root_interface_file,
 		Min_sdk_version:     getMinSdkVersion(m.Name()),
-		Tags:                android.ConvertApexAvailableToTags(m.properties.Apex_available),
+		Tags:                android.ConvertApexAvailableToTagsWithoutTestApexes(ctx, m.properties.Apex_available),
 	}
 
 	props := bazel.BazelTargetModuleProperties{
