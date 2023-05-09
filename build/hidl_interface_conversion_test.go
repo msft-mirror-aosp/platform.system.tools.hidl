@@ -97,14 +97,14 @@ cc_defaults {
 		name: "hidl-module-defaults",
 }
 hidl_interface {
-		name: "android.hardware.nfc@1.0",
+		name: "android.hardware.neuralnetworks@1.0",
 		srcs: ["types.hal", "IBase.hal"],
 		root: "android.hardware",
 		gen_java: false,
 }`,
 		ExpectedBazelTargets: []string{
-			bp2build.MakeBazelTargetNoRestrictions("hidl_interface", "android.hardware.nfc@1.0", bp2build.AttrNameToString{
-				"min_sdk_version":     `"29"`,
+			bp2build.MakeBazelTargetNoRestrictions("hidl_interface", "android.hardware.neuralnetworks@1.0", bp2build.AttrNameToString{
+				"min_sdk_version":     `"30"`,
 				"root":                `"android.hardware"`,
 				"root_interface_file": `"//foo/bar:current.txt"`,
 				"srcs": `[
