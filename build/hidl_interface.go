@@ -98,7 +98,7 @@ var (
 func init() {
 	android.RegisterModuleType("prebuilt_hidl_interfaces", prebuiltHidlInterfaceFactory)
 	android.RegisterModuleType("hidl_interface", HidlInterfaceFactory)
-	android.RegisterSingletonType("all_hidl_lints", allHidlLintsFactory)
+	android.RegisterParallelSingletonType("all_hidl_lints", allHidlLintsFactory)
 	android.RegisterModuleType("hidl_interfaces_metadata", hidlInterfacesMetadataSingletonFactory)
 	pctx.Import("android/soong/android")
 }
