@@ -23,6 +23,7 @@ python_test_host {
     test_options: {
         unit_test: false,
     },
+    data_device_bins_both: ["hidl_test_java_native"],
 }
 
 cc_test {

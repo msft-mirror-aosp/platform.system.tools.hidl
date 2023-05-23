@@ -98,7 +98,7 @@ var (
 func init() {
 	android.RegisterModuleType("prebuilt_hidl_interfaces", prebuiltHidlInterfaceFactory)
 	android.RegisterModuleType("hidl_interface", HidlInterfaceFactory)
-	android.RegisterSingletonType("all_hidl_lints", allHidlLintsFactory)
+	android.RegisterParallelSingletonType("all_hidl_lints", allHidlLintsFactory)
 	android.RegisterModuleType("hidl_interfaces_metadata", hidlInterfacesMetadataSingletonFactory)
 	pctx.Import("android/soong/android")
 }
@@ -792,12 +792,14 @@ func (m *hidlInterface) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
 		}
 	}
 
+	bazel_hidl_interface_name := strings.TrimSuffix(m.Name(), hidlInterfaceSuffix)
+
 	attrs := &hidlInterfaceAttributes{
 		Srcs:                srcs,
 		Deps:                bazel.MakeLabelListAttribute(bazel.MakeLabelList(dep_labels)),
 		Root:                root,
 		Root_interface_file: root_interface_file,
-		Min_sdk_version:     getMinSdkVersion(m.Name()),
+		Min_sdk_version:     getMinSdkVersion(bazel_hidl_interface_name),
 		Tags:                android.ConvertApexAvailableToTagsWithoutTestApexes(ctx, m.properties.Apex_available),
 	}
 
@@ -806,7 +808,7 @@ func (m *hidlInterface) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
 		Bzl_load_location: "//build/bazel/rules/hidl:hidl_interface.bzl",
 	}
 
-	ctx.CreateBazelTargetModule(props, android.CommonAttributes{Name: strings.TrimSuffix(m.Name(), hidlInterfaceSuffix)}, attrs)
+	ctx.CreateBazelTargetModule(props, android.CommonAttributes{Name: bazel_hidl_interface_name}, attrs)
 }
 
 var minSdkVersion = map[string]string{
