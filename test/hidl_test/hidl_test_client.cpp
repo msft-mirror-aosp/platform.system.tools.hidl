@@ -361,16 +361,17 @@ public:
 
     void getServices() {
         manager = IServiceManager::getService();
-
         // alternatively:
         // manager = defaultServiceManager()
 
         ASSERT_NE(manager, nullptr);
         ASSERT_TRUE(manager->isRemote()); // manager is always remote
 
+        // Token manager only exists on devices before Android V
         tokenManager = ITokenManager::getService();
-        ASSERT_NE(tokenManager, nullptr);
-        ASSERT_TRUE(tokenManager->isRemote()); // tokenManager is always remote
+        if (tokenManager) {
+            ASSERT_TRUE(tokenManager->isRemote());  // tokenManager is always remote
+        }
 
         ashmemAllocator = IAllocator::getService("ashmem");
         ASSERT_NE(ashmemAllocator, nullptr);
@@ -871,6 +872,9 @@ TEST_F(HidlTest, InterfacesEqualTest) {
 TEST_F(HidlTest, TestToken) {
     using android::hardware::interfacesEqual;
 
+    if (!tokenManager) {
+        GTEST_SKIP() << "Token manager is not available devices newer than Android U";
+    }
     Return<void> ret = tokenManager->createToken(manager, [&] (const hidl_vec<uint8_t> &token) {
         Return<sp<IBase>> retService = tokenManager->get(token);
         EXPECT_OK(retService);
