@@ -309,9 +309,22 @@ void EnumType::emitTypeDeclarations(Formatter& out) const {
         const auto &type = *it;
 
         for (const auto &entry : type->values()) {
+            auto name = entry->name();
+
+            // The math.h header defines a NAN macro that breaks that declaration of a NAN
+            // enumerator in the wifi HAL. Undefine that macro before declaring the enumerator.
+            // This change strictly improves the situation, because the enum won't compile if the
+            // NAN macro is defined. It does not fix attempts to use NAN, because the include order
+            // of math.h versus a HIDL header determines which NAN is declared. Code that wants to
+            // use the wifi NAN may still need to #undef the math.h macro. This special handling
+            // only happens for NAN, because we might want to diagnose other macro<->enum conflicts.
+            if (name == "NAN") {
+                out << "#undef NAN // avoid conflict with math.h NAN\n";
+            }
+
             entry->emitDocComment(out);
 
-            out << entry->name();
+            out << name;
 
             std::string value = entry->cppValue(scalarType->getKind());
             CHECK(!value.empty()); // use autofilled values for c++.
