@@ -26,6 +26,7 @@ import (
 	"android/soong/cc"
 	"android/soong/genrule"
 	"android/soong/java"
+	"android/soong/ui/metrics/bp2build_metrics_proto"
 )
 
 var (
@@ -211,6 +212,7 @@ type hidlGenProperties struct {
 
 type hidlGenRule struct {
 	android.ModuleBase
+	android.BazelModuleBase
 
 	properties hidlGenProperties
 
@@ -350,10 +352,21 @@ func (g *hidlGenRule) DepsMutator(ctx android.BottomUpMutatorContext) {
 	ctx.AddReverseDependency(ctx.Module(), nil, hidlMetadataSingletonName)
 }
 
+func (g *hidlGenRule) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
+	hidlLang := g.properties.Language
+	switch hidlLang {
+	case "c++-sources", "c++-headers":
+		panic(fmt.Errorf("Conversion of %q is handled via macros in Bazel", ctx.ModuleName()))
+	default:
+		ctx.MarkBp2buildUnconvertible(bp2build_metrics_proto.UnconvertedReasonType_PROPERTY_UNSUPPORTED, fmt.Sprintf("Lang: %q", hidlLang))
+	}
+}
+
 func hidlGenFactory() android.Module {
 	g := &hidlGenRule{}
 	g.AddProperties(&g.properties)
 	android.InitAndroidModule(g)
+	android.InitBazelModule(g)
 	return g
 }
 
@@ -555,6 +568,13 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 		vendorAvailable = proptools.BoolPtr(true)
 	}
 
+	var bp2build bool
+	// TODO: b/295566168 - this will need to change once build files are checked in to account for
+	// checked in modules in mixed builds
+	if b, ok := mctx.Module().(android.Bazelable); ok {
+		bp2build = b.ShouldConvertWithBp2build(mctx)
+	}
+
 	// TODO(b/69002743): remove filegroups
 	mctx.CreateModule(android.FileGroupFactory, &fileGroupProperties{
 		Name: proptools.StringPtr(name.fileGroupName()),
@@ -566,6 +586,15 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			}},
 	)
 
+	var ccBp2build *bool
+	var ccHeadersLabel, ccSourcesLabel *string
+	if bp2build {
+		ccHeadersLabel = proptools.StringPtr(fmt.Sprintf("//%s:%s", mctx.ModuleDir(), name.headersName()))
+		ccSourcesLabel = proptools.StringPtr(fmt.Sprintf("//%s:%s", mctx.ModuleDir(), name.sourcesName()))
+	} else {
+		ccBp2build = proptools.BoolPtr(false)
+	}
+
 	mctx.CreateModule(hidlGenFactory, &nameProperties{
 		Name: proptools.StringPtr(name.sourcesName()),
 	}, &hidlGenProperties{
@@ -575,7 +604,13 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 		Interfaces: i.properties.Interfaces,
 		Inputs:     i.properties.Srcs,
 		Outputs:    concat(wrap(name.dir(), interfaces, "All.cpp"), wrap(name.dir(), types, ".cpp")),
-	})
+	},
+		&bazelProperties{
+			&Bazel_module{
+				Label:              ccSourcesLabel,
+				Bp2build_available: ccBp2build,
+			}},
+	)
 	mctx.CreateModule(hidlGenFactory, &nameProperties{
 		Name: proptools.StringPtr(name.headersName()),
 	}, &hidlGenProperties{
@@ -591,9 +626,19 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			wrap(name.dir()+"IHw", interfaces, ".h"),
 			wrap(name.dir(), types, ".h"),
 			wrap(name.dir()+"hw", types, ".h")),
-	})
+	},
+		&bazelProperties{
+			&Bazel_module{
+				Label:              ccHeadersLabel,
+				Bp2build_available: ccBp2build,
+			}},
+	)
 
 	if shouldGenerateLibrary {
+		var label *string
+		if bp2build {
+			label = proptools.StringPtr(fmt.Sprintf("//%s:%s", mctx.ModuleDir(), name.string()))
+		}
 		mctx.CreateModule(cc.LibraryFactory, &ccProperties{
 			Name:               proptools.StringPtr(name.string()),
 			Host_supported:     proptools.BoolPtr(true),
@@ -619,11 +664,10 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Apex_available:           i.properties.Apex_available,
 			Min_sdk_version:          getMinSdkVersion(name.string()),
 		}, &i.properties.VndkProperties,
-			// TODO(b/237810289): We need to disable/enable based on if a module has
-			// been converted or not, otherwise mixed build will fail.
 			&bazelProperties{
 				&Bazel_module{
-					Bp2build_available: proptools.BoolPtr(false),
+					Label:              label,
+					Bp2build_available: ccBp2build,
 				}},
 		)
 	}
@@ -658,11 +702,21 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 		mctx.CreateModule(java.LibraryFactory, &javaProperties{
 			Name:        proptools.StringPtr(name.javaName()),
 			Static_libs: javaDependencies,
-		}, &commonJavaProperties)
+		}, &commonJavaProperties,
+			&bazelProperties{
+				&Bazel_module{
+					Bp2build_available: proptools.BoolPtr(false),
+				}},
+		)
 		mctx.CreateModule(java.LibraryFactory, &javaProperties{
 			Name: proptools.StringPtr(name.javaSharedName()),
 			Libs: javaDependencies,
-		}, &commonJavaProperties)
+		}, &commonJavaProperties,
+			&bazelProperties{
+				&Bazel_module{
+					Bp2build_available: proptools.BoolPtr(false),
+				}},
+		)
 	}
 
 	if shouldGenerateJavaConstants {
@@ -683,7 +737,12 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Srcs:            []string{":" + name.javaConstantsSourcesName()},
 			Apex_available:  i.properties.Apex_available,
 			Min_sdk_version: getMinSdkVersion(name.string()),
-		})
+		},
+			&bazelProperties{
+				&Bazel_module{
+					Bp2build_available: proptools.BoolPtr(false),
+				}},
+		)
 	}
 
 	mctx.CreateModule(hidlGenFactory, &nameProperties{
