@@ -575,6 +575,14 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 		bp2build = b.ShouldConvertWithBp2build(mctx)
 	}
 
+	var fgBp2build *bool
+	var fgLabel *string
+	if bp2build {
+		fgLabel = proptools.StringPtr(fmt.Sprintf("//%s:%s", mctx.ModuleDir(), name.fileGroupName()))
+	} else {
+		fgBp2build = proptools.BoolPtr(false)
+	}
+
 	// TODO(b/69002743): remove filegroups
 	mctx.CreateModule(android.FileGroupFactory, &fileGroupProperties{
 		Name: proptools.StringPtr(name.fileGroupName()),
@@ -582,7 +590,8 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 	},
 		&bazelProperties{
 			&Bazel_module{
-				Bp2build_available: proptools.BoolPtr(false),
+				Label:              fgLabel,
+				Bp2build_available: fgBp2build,
 			}},
 	)
 
