@@ -575,6 +575,14 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 		bp2build = b.ShouldConvertWithBp2build(mctx)
 	}
 
+	var fgBp2build *bool
+	var fgLabel *string
+	if bp2build {
+		fgLabel = proptools.StringPtr(fmt.Sprintf("//%s:%s", mctx.ModuleDir(), name.fileGroupName()))
+	} else {
+		fgBp2build = proptools.BoolPtr(false)
+	}
+
 	// TODO(b/69002743): remove filegroups
 	mctx.CreateModule(android.FileGroupFactory, &fileGroupProperties{
 		Name: proptools.StringPtr(name.fileGroupName()),
@@ -582,7 +590,8 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 	},
 		&bazelProperties{
 			&Bazel_module{
-				Bp2build_available: proptools.BoolPtr(false),
+				Label:              fgLabel,
+				Bp2build_available: fgBp2build,
 			}},
 	)
 
@@ -800,17 +809,15 @@ func HidlInterfaceFactory() android.Module {
 }
 
 type hidlInterfaceAttributes struct {
-	Srcs                bazel.LabelListAttribute
-	Deps                bazel.LabelListAttribute
-	Root                string
-	Root_interface_file bazel.LabelAttribute
-	Min_sdk_version     *string
-	Tags                []string
+	Srcs            bazel.LabelListAttribute
+	Deps            bazel.LabelListAttribute
+	Root            bazel.Label
+	Min_sdk_version *string
+	Tags            []string
 }
 
 func (m *hidlInterface) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
-	srcs := bazel.MakeLabelListAttribute(
-		android.BazelLabelForModuleSrc(ctx, m.properties.Srcs))
+	srcs := bazel.MakeLabelListAttribute(android.BazelLabelForModuleSrc(ctx, m.properties.Srcs))
 
 	// The interface dependencies are added earlier with the suffix of "_interface",
 	// so we need to look for them with the hidlInterfaceSuffix added to the names.
@@ -829,37 +836,16 @@ func (m *hidlInterface) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
 			bazel.Label{Label: strings.TrimSuffix(label.Label, hidlInterfaceSuffix)})
 	}
 
-	var root string
-	var root_interface_file bazel.LabelAttribute
-	if module, exists := ctx.ModuleFromName(m.properties.Root); exists {
-		if pkg_root, ok := module.(*hidlPackageRoot); ok {
-			var path string
-			if pkg_root.properties.Path != nil {
-				path = *pkg_root.properties.Path
-			} else {
-				path = ctx.OtherModuleDir(pkg_root)
-			}
-			// The root and root_interface come from the hidl_package_root module that
-			// this module depends on, we don't convert hidl_package_root module
-			// separately since all the other properties of that module are deprecated.
-			root = pkg_root.Name()
-			if path == ctx.ModuleDir() {
-				root_interface_file = *bazel.MakeLabelAttribute(":" + "current.txt")
-			} else {
-				root_interface_file = *bazel.MakeLabelAttribute("//" + path + ":" + "current.txt")
-			}
-		}
-	}
+	root := android.BazelLabelForModuleDepSingle(ctx, m.properties.Root)
 
 	bazel_hidl_interface_name := strings.TrimSuffix(m.Name(), hidlInterfaceSuffix)
 
 	attrs := &hidlInterfaceAttributes{
-		Srcs:                srcs,
-		Deps:                bazel.MakeLabelListAttribute(bazel.MakeLabelList(dep_labels)),
-		Root:                root,
-		Root_interface_file: root_interface_file,
-		Min_sdk_version:     getMinSdkVersion(bazel_hidl_interface_name),
-		Tags:                android.ConvertApexAvailableToTagsWithoutTestApexes(ctx, m.properties.Apex_available),
+		Srcs:            srcs,
+		Deps:            bazel.MakeLabelListAttribute(bazel.MakeLabelList(dep_labels)),
+		Root:            root,
+		Min_sdk_version: getMinSdkVersion(bazel_hidl_interface_name),
+		Tags:            android.ConvertApexAvailableToTagsWithoutTestApexes(ctx, m.properties.Apex_available),
 	}
 
 	props := bazel.BazelTargetModuleProperties{
