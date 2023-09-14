@@ -765,6 +765,7 @@ void AST::generateProxyHeader(Formatter& out) const {
 
     generateCppPackageInclude(out, mPackage, iface->getHwName());
     out << "\n";
+    out << "#include <mutex>\n";
 
     enterLeaveNamespace(out, true /* enter */);
     out << "\n";
