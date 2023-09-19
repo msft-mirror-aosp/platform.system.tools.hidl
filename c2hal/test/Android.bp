@@ -29,13 +29,14 @@ genrule {
         "hidl-gen",
     ],
     cmd: "$(location c2hal) -o $(genDir)/c2hal_test/1.0 " +
-         "    -p android.hardware.c2hal_test@1.0 $(in) && " +
-         "$(location hidl-gen) -o $(genDir) -Lc++ " +
-         "    -r android.hardware:$(genDir) " +
-         "    -r android.hidl:system/libhidl/transport " +
-         "    android.hardware.c2hal_test@1.0",
+        "    -p android.hardware.c2hal_test@1.0 $(location simple.h) && " +
+        "$(location hidl-gen) -o $(genDir) -Lc++ " +
+        "    -r android.hardware:$(genDir) " +
+        "    -r android.hidl:system/libhidl/transport " +
+        "    android.hardware.c2hal_test@1.0",
     srcs: [
         "simple.h",
+        ":android.hidl.base@1.0_hal",
     ],
     out: [
         "android/hardware/c2hal_test/1.0/BnHwSimple.h",
@@ -60,13 +61,14 @@ genrule {
         "hidl-gen",
     ],
     cmd: "$(location c2hal) -o $(genDir)/c2hal_test/1.0 " +
-         "    -p android.hardware.c2hal_test@1.0 $(in) && " +
-         "$(location hidl-gen) -o $(genDir) -Lc++ " +
-         "    -r android.hardware:$(genDir) " +
-         "    -r android.hidl:system/libhidl/transport " +
-         "    android.hardware.c2hal_test@1.0",
+        "    -p android.hardware.c2hal_test@1.0 $(location simple.h) && " +
+        "$(location hidl-gen) -o $(genDir) -Lc++ " +
+        "    -r android.hardware:$(genDir) " +
+        "    -r android.hidl:system/libhidl/transport " +
+        "    android.hardware.c2hal_test@1.0",
     srcs: [
         "simple.h",
+        ":android.hidl.base@1.0_hal",
     ],
     out: [
         "android/hardware/c2hal_test/1.0/SimpleAll.cpp",

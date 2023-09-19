@@ -40,6 +40,13 @@ genrule_defaults {
         "mv $(genDir)/include/hidl2aidl/test/extension/translate-ndk.h $(genDir)/hidl2aidl/test/extension/ && " +
         "mv $(genDir)/include/hidl2aidl/test/extension/translate-cpp.h $(genDir)/hidl2aidl/test/extension/ ",
     srcs: [
+        ":android.hidl.base@1.0_hal",
+        ":android.hidl.safe_union@1.0_hal",
+        ":hidl2aidl.test@1.0_hal",
+        ":hidl2aidl.test@1.1_hal",
+        ":hidl2aidl.test@1.2_hal",
+        ":hidl2aidl.test@2.0_hal",
+        ":hidl2aidl.test.extension@1.2_hal",
         "1.0/IBar.hal",
         "1.0/IFoo.hal",
         "1.0/types.hal",
