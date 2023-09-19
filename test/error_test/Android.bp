@@ -15,6 +15,7 @@ genrule {
          "echo 'int main(){return 0;}' > $(genDir)/TODO_b_37575883.cpp",
     out: ["TODO_b_37575883.cpp"],
     srcs: [
+        ":android.hidl.base@1.0_hal",
         "**/*.hal",
         "**/required_error",
     ],
