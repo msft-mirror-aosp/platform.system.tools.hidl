@@ -352,7 +352,7 @@ func (g *hidlGenRule) DepsMutator(ctx android.BottomUpMutatorContext) {
 	ctx.AddReverseDependency(ctx.Module(), nil, hidlMetadataSingletonName)
 }
 
-func (g *hidlGenRule) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
+func (g *hidlGenRule) ConvertWithBp2build(ctx android.Bp2buildMutatorContext) {
 	hidlLang := g.properties.Language
 	switch hidlLang {
 	case "c++-sources", "c++-headers":
@@ -816,8 +816,9 @@ type hidlInterfaceAttributes struct {
 	Tags            []string
 }
 
-func (m *hidlInterface) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
-	srcs := bazel.MakeLabelListAttribute(android.BazelLabelForModuleSrc(ctx, m.properties.Srcs))
+func (m *hidlInterface) ConvertWithBp2build(ctx android.Bp2buildMutatorContext) {
+	srcs := bazel.MakeLabelListAttribute(
+		android.BazelLabelForModuleSrc(ctx, m.properties.Srcs))
 
 	// The interface dependencies are added earlier with the suffix of "_interface",
 	// so we need to look for them with the hidlInterfaceSuffix added to the names.

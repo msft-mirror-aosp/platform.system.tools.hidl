@@ -100,7 +100,7 @@ type hidlPackageRootAttributes struct {
 	Current bazel.LabelAttribute
 }
 
-func (r *hidlPackageRoot) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
+func (r *hidlPackageRoot) ConvertWithBp2build(ctx android.Bp2buildMutatorContext) {
 	attrs := &hidlPackageRootAttributes{
 		Path: r.properties.Path,
 	}
