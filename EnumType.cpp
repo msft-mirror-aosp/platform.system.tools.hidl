@@ -321,6 +321,10 @@ void EnumType::emitTypeDeclarations(Formatter& out) const {
             if (name == "NAN") {
                 out << "#undef NAN // avoid conflict with math.h NAN\n";
             }
+            // The same hack is also needed for math.h OVERFLOW.
+            if (name == "OVERFLOW") {
+                out << "#undef OVERFLOW // avoid conflict with math.h OVERFLOW\n";
+            }
 
             entry->emitDocComment(out);
 
