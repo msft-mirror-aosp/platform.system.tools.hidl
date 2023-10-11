@@ -111,6 +111,7 @@ hidl_interface {
 		root: "android.hardware",
 		gen_java: false,
 }`,
+		StubbedBuildDefinitions: []string{"//foo/bar:android.hardware"},
 		ExpectedBazelTargets: []string{
 			bp2build.MakeBazelTargetNoRestrictions("hidl_interface", "android.hardware.neuralnetworks@1.0", bp2build.AttrNameToString{
 				"min_sdk_version": `"30"`,
