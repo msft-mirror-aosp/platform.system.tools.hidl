@@ -38,6 +38,9 @@ func runHidlInterfaceTestCase(t *testing.T, tc bp2build.Bp2buildTestCase) {
 func TestHidlInterface(t *testing.T) {
 	runHidlInterfaceTestCase(t, bp2build.Bp2buildTestCase{
 		Description: `hidl_interface with common usage of properties`,
+		Filesystem: map[string]string{
+			"current.txt": "",
+		},
 		Blueprint: `
 hidl_package_root {
 		name: "android.hardware",
@@ -61,23 +64,24 @@ hidl_interface {
 }`,
 		ExpectedBazelTargets: []string{
 			bp2build.MakeBazelTargetNoRestrictions("hidl_interface", "android.hardware.nfc@1.0", bp2build.AttrNameToString{
-				"min_sdk_version":     `"29"`,
-				"root":                `"android.hardware"`,
-				"root_interface_file": `":current.txt"`,
+				"min_sdk_version": `"29"`,
+				"root":            `":android.hardware"`,
 				"srcs": `[
         "types.hal",
         "IBase.hal",
     ]`,
 			}),
 			bp2build.MakeBazelTargetNoRestrictions("hidl_interface", "android.hardware.nfc@1.1", bp2build.AttrNameToString{
-				"deps":                `[":android.hardware.nfc@1.0"]`,
-				"min_sdk_version":     `"29"`,
-				"root":                `"android.hardware"`,
-				"root_interface_file": `":current.txt"`,
+				"deps":            `[":android.hardware.nfc@1.0"]`,
+				"min_sdk_version": `"29"`,
+				"root":            `":android.hardware"`,
 				"srcs": `[
         "types.hal",
         "INfc.hal",
     ]`,
+			}),
+			bp2build.MakeBazelTargetNoRestrictions("hidl_package_root", "android.hardware", bp2build.AttrNameToString{
+				"current": `"current.txt"`,
 			}),
 		},
 	})
@@ -91,10 +95,15 @@ func TestHidlInterfacePackageRootInAnotherBp(t *testing.T) {
 hidl_package_root {
 		name: "android.hardware",
 		use_current: true,
-}`},
+}`,
+			"foo/bar/current.txt": "",
+		},
 		Blueprint: `
 cc_defaults {
 		name: "hidl-module-defaults",
+}
+hidl_package_root{
+	name: "foo",
 }
 hidl_interface {
 		name: "android.hardware.neuralnetworks@1.0",
@@ -102,16 +111,17 @@ hidl_interface {
 		root: "android.hardware",
 		gen_java: false,
 }`,
+		StubbedBuildDefinitions: []string{"//foo/bar:android.hardware"},
 		ExpectedBazelTargets: []string{
 			bp2build.MakeBazelTargetNoRestrictions("hidl_interface", "android.hardware.neuralnetworks@1.0", bp2build.AttrNameToString{
-				"min_sdk_version":     `"30"`,
-				"root":                `"android.hardware"`,
-				"root_interface_file": `"//foo/bar:current.txt"`,
+				"min_sdk_version": `"30"`,
+				"root":            `"//foo/bar:android.hardware"`,
 				"srcs": `[
         "types.hal",
         "IBase.hal",
     ]`,
 			}),
+			bp2build.MakeBazelTargetNoRestrictions("hidl_package_root", "foo", bp2build.AttrNameToString{}),
 		},
 	})
 }
