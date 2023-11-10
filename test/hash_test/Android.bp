@@ -43,6 +43,7 @@ genrule {
         "missing_hash/hash/1.0/IUnhashed.hal",
         ":android.hidl",
         ":android.hidl.base@1.0_hal",
+        ":checked_in_hidl_current",
     ],
 }
 
