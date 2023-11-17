@@ -26,6 +26,8 @@ cc_defaults {
     name: "hidl_test-defaults",
     defaults: ["hidl-gen-defaults"],
 
+    cpp_std: "gnu++17",
+
     shared_libs: [
         "android.hidl.memory@1.0",
         "android.hidl.memory.token@1.0",
