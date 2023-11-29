@@ -13,15 +13,17 @@ cc_test {
     srcs: ["hidl_lazy_test.cpp"],
 
     shared_libs: [
-        "android.hardware.tests.lazy@1.0",
-        "android.hardware.tests.lazy@1.1",
-        "android.hardware.tests.lazy_cb@1.0",
         "libbase",
         "libcutils",
         "libhidl-gen-utils",
         "libhidlbase",
         "liblog",
         "libutils",
+    ],
+    static_libs: [
+        "android.hardware.tests.lazy@1.0",
+        "android.hardware.tests.lazy@1.1",
+        "android.hardware.tests.lazy_cb@1.0",
     ],
 
     test_suites: ["general-tests"],
