@@ -26,6 +26,13 @@ def run_cmd(cmd, ignore_error=False):
         raise subprocess.CalledProcessError(p.returncode, cmd)
     return p.returncode
 
+def has_hwservicemanager():
+    # if the property is set, or hwservicemanager is missing, then we don't have
+    # hwservicemanger running.
+    return 0 != run_cmd("echo '[[ \"$(getprop hwservicemanager.disabled)\" == \"true\" ]] || " +
+                        "[[ ! -f /system/bin/hwservicemanager ]]' | adb shell sh", ignore_error=True)
+
+@unittest.skipUnless(has_hwservicemanager(), "no hwservicemanager")
 class TestHidl(unittest.TestCase):
     pass
 
