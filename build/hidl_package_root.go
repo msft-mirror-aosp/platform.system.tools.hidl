@@ -21,7 +21,6 @@ import (
 	"github.com/google/blueprint/proptools"
 
 	"android/soong/android"
-	"android/soong/bazel"
 )
 
 var (
@@ -51,7 +50,6 @@ func init() {
 
 type hidlPackageRoot struct {
 	android.ModuleBase
-	android.BazelModuleBase
 
 	properties hidlPackageRootProperties
 
@@ -95,29 +93,6 @@ func (r *hidlPackageRoot) Srcs() android.Paths {
 	return r.genOutputs
 }
 
-type hidlPackageRootAttributes struct {
-	Path    *string
-	Current bazel.LabelAttribute
-}
-
-func (r *hidlPackageRoot) ConvertWithBp2build(ctx android.Bp2buildMutatorContext) {
-	attrs := &hidlPackageRootAttributes{
-		Path: r.properties.Path,
-	}
-	currentPath := android.ExistentPathForSource(ctx, ctx.ModuleDir(), "current.txt")
-	if currentPath.Valid() {
-		attrs.Current = *bazel.MakeLabelAttribute("current.txt")
-	}
-
-	props := bazel.BazelTargetModuleProperties{
-		Rule_class:        "hidl_package_root",
-		Bzl_load_location: "//build/bazel/rules/hidl:hidl_package_root.bzl",
-	}
-
-	ctx.CreateBazelTargetModule(props, android.CommonAttributes{Name: ctx.ModuleName()}, attrs)
-
-}
-
 func (r *hidlPackageRoot) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	if r.properties.Path == nil {
 		r.properties.Path = proptools.StringPtr(ctx.ModuleDir())
@@ -150,7 +125,6 @@ func HidlPackageRootFactory() android.Module {
 	r := &hidlPackageRoot{}
 	r.AddProperties(&r.properties)
 	android.InitAndroidModule(r)
-	android.InitBazelModule(r)
 
 	packageRootsMutex.Lock()
 	packageRoots = append(packageRoots, r)
