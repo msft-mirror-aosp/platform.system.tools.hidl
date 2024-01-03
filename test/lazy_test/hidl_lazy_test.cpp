@@ -68,6 +68,13 @@ class HidlLazyTestBase : public ::testing::Test {
     void SetUp() override {
         manager = IServiceManager::getService();
         ASSERT_NE(manager, nullptr);
+        // if the services aren't installed/declared on the device, skip.
+        // if one is installed, the other(s) are also installed so skip on the
+        // first instance that isn't declared.
+        for (const auto& instance : gInstances) {
+            if (!isServiceDeclared(instance))
+                GTEST_SKIP() << "No HIDL lazy test services on device";
+        }
     }
 
     bool isServiceRunning(const FqInstance& instance) {
@@ -83,6 +90,13 @@ class HidlLazyTestBase : public ::testing::Test {
                                              })
                             .isOk());
         return isRunning;
+    }
+    bool isServiceDeclared(const FqInstance& instance) {
+        const auto transport =
+                manager->getTransport(instance.getFqName().string(), instance.getInstance());
+        EXPECT_TRUE(transport.isOk());
+        if (transport == IServiceManager::Transport::HWBINDER) return true;
+        return false;
     }
 };
 
