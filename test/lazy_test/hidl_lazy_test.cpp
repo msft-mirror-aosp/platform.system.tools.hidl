@@ -36,7 +36,6 @@
 #include <hidl/HidlSupport.h>
 #include <hidl/HidlTransportSupport.h>
 #include <hidl/HidlTransportUtils.h>
-#include <hidl/ServiceManagement.h>
 #include <hwbinder/IPCThreadState.h>
 
 using ::android::FqInstance;
@@ -68,6 +67,13 @@ class HidlLazyTestBase : public ::testing::Test {
     void SetUp() override {
         manager = IServiceManager::getService();
         ASSERT_NE(manager, nullptr);
+        // if the services aren't installed/declared on the device, skip.
+        // if one is installed, the other(s) are also installed so skip on the
+        // first instance that isn't declared.
+        for (const auto& instance : gInstances) {
+            if (!isServiceDeclared(instance))
+                GTEST_SKIP() << "No HIDL lazy test services on device";
+        }
     }
 
     bool isServiceRunning(const FqInstance& instance) {
@@ -84,13 +90,18 @@ class HidlLazyTestBase : public ::testing::Test {
                             .isOk());
         return isRunning;
     }
+    bool isServiceDeclared(const FqInstance& instance) {
+        const auto transport =
+                manager->getTransport(instance.getFqName().string(), instance.getInstance());
+        EXPECT_TRUE(transport.isOk());
+        if (transport == IServiceManager::Transport::HWBINDER) return true;
+        return false;
+    }
 };
 
 class HidlLazyTest : public HidlLazyTestBase {
   protected:
     void SetUp() override {
-        if (!android::hardware::isHidlSupported())
-            GTEST_SKIP() << "HIDL is not supported on this device";
         HidlLazyTestBase::SetUp();
         for (const auto& instance : gInstances) {
             ASSERT_FALSE(isServiceRunning(instance))
@@ -102,8 +113,6 @@ class HidlLazyTest : public HidlLazyTestBase {
     }
 
     void TearDown() override {
-        // If we skipped the setup, then we skip the TearDown.
-        if (!android::hardware::isHidlSupported()) return;
         std::cout << "Waiting " << SHUTDOWN_WAIT_TIME << " seconds before checking that the "
                   << "service has shut down." << std::endl;
         IPCThreadState::self()->flushCommands();
@@ -119,11 +128,6 @@ class HidlLazyTest : public HidlLazyTestBase {
 class HidlLazyCbTest : public HidlLazyTestBase {
   protected:
     static constexpr size_t CALLBACK_SHUTDOWN_WAIT_TIME = 5;
-    void SetUp() override {
-        if (!android::hardware::isHidlSupported())
-            GTEST_SKIP() << "HIDL is not supported on this device";
-        HidlLazyTestBase::SetUp();
-    }
 };
 
 static constexpr size_t NUM_IMMEDIATE_GET_UNGETS = 100;
