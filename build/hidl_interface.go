@@ -39,22 +39,22 @@ var (
 	intermediatesDir = pctx.IntermediatesPathVariable("intermediatesDir", "")
 
 	hidlRule = pctx.StaticRule("hidlRule", blueprint.RuleParams{
-		Depfile:     "${depfile}",
+		Depfile:     "${out}.d",
 		Deps:        blueprint.DepsGCC,
-		Command:     "rm -rf ${genDir} && ${hidl} -R -p . -d ${depfile} -o ${genDir} -L ${language} ${options} ${fqName}",
+		Command:     "rm -rf ${genDir} && ${hidl} -R -p . -d ${out}.d -o ${genDir} -L ${language} ${options} ${fqName}",
 		CommandDeps: []string{"${hidl}"},
 		Description: "HIDL ${language}: ${in} => ${out}",
-	}, "depfile", "fqName", "genDir", "language", "options")
+	}, "fqName", "genDir", "language", "options")
 
 	hidlSrcJarRule = pctx.StaticRule("hidlSrcJarRule", blueprint.RuleParams{
-		Depfile: "${depfile}",
+		Depfile: "${out}.d",
 		Deps:    blueprint.DepsGCC,
 		Command: "rm -rf ${genDir} && " +
-			"${hidl} -R -p . -d ${depfile} -o ${genDir}/srcs -L ${language} ${options} ${fqName} && " +
+			"${hidl} -R -p . -d ${out}.d -o ${genDir}/srcs -L ${language} ${options} ${fqName} && " +
 			"${soong_zip} -o ${genDir}/srcs.srcjar -C ${genDir}/srcs -D ${genDir}/srcs",
 		CommandDeps: []string{"${hidl}", "${soong_zip}"},
 		Description: "HIDL ${language}: ${in} => srcs.srcjar",
-	}, "depfile", "fqName", "genDir", "language", "options")
+	}, "fqName", "genDir", "language", "options")
 
 	lintRule = pctx.StaticRule("lintRule", blueprint.RuleParams{
 		Command:     "rm -f ${output} && touch ${output} && ${lint} -j -e -R -p . ${options} ${fqName} > ${output}",
@@ -316,7 +316,6 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		Output:          g.genOutputs[0],
 		ImplicitOutputs: g.genOutputs[1:],
 		Args: map[string]string{
-			"depfile":  g.genOutputs[0].String() + ".d",
 			"genDir":   g.genOutputDir.String(),
 			"fqName":   g.properties.FqName,
 			"language": g.properties.Language,
