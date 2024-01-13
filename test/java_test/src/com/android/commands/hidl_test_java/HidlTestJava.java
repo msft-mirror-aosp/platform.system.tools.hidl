@@ -245,7 +245,13 @@ public final class HidlTestJava {
     }
 
     private void runClientMemoryTests() throws RemoteException, IOException, ErrnoException {
-        IMemoryInterface memoryInterface = IMemoryInterface.getService();
+        IMemoryInterface memoryInterface;
+        try {
+            memoryInterface = IMemoryInterface.getService();
+        } catch (NoSuchElementException e) {
+            // If the test didn't register the memory interface, don't try to test it.
+            return;
+        }
 
         {
             HidlMemory hidlMem = HidlMemoryUtil.byteArrayToHidlMemory(
