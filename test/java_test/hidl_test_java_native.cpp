@@ -1278,9 +1278,16 @@ int main(int argc, char **argv) {
     status = registerPassthroughServiceImplementation<ISafeUnion>();
     CHECK(status == ::android::OK) << "ISafeUnion didn't register";
 
-    sp<IMemoryInterface> memoryInterface = new MemoryInterface();
-    status = memoryInterface->registerAsService();
-    CHECK(status == ::android::OK) << "IMemoryInterface didn't register";
+    using android::hardware::defaultServiceManager;
+    using android::hidl::manager::V1_0::IServiceManager;
+    // If the android.hidl.allocator service isn't on the device, then don't
+    // create or register the MemoryInterface
+    if (IServiceManager::Transport::EMPTY !=
+        defaultServiceManager()->getTransport(IAllocator::descriptor, "ashmem")) {
+        sp<IMemoryInterface> memoryInterface = new MemoryInterface();
+        status = memoryInterface->registerAsService();
+        CHECK(status == ::android::OK) << "IMemoryInterface didn't register";
+    }
 
     joinRpcThreadpool();
     return 0;
