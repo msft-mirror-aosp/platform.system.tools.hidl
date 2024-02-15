@@ -14,7 +14,8 @@ genrule {
     ],
     srcs: [
         "1.0/IFoo.hal",
-        "1.0/types.hal"
+        "1.0/types.hal",
+        ":android.hidl.base@1.0_hal",
     ],
     cmd: "$(location hidl-gen) -o $(genDir)/export-base.h -Lexport-header " +
          "-rexport:system/tools/hidl/test/export_test export@1.0",

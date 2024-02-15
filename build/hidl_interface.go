@@ -22,7 +22,6 @@ import (
 	"github.com/google/blueprint/proptools"
 
 	"android/soong/android"
-	"android/soong/bazel"
 	"android/soong/cc"
 	"android/soong/genrule"
 	"android/soong/java"
@@ -40,22 +39,22 @@ var (
 	intermediatesDir = pctx.IntermediatesPathVariable("intermediatesDir", "")
 
 	hidlRule = pctx.StaticRule("hidlRule", blueprint.RuleParams{
-		Depfile:     "${depfile}",
+		Depfile:     "${out}.d",
 		Deps:        blueprint.DepsGCC,
-		Command:     "rm -rf ${genDir} && ${hidl} -R -p . -d ${depfile} -o ${genDir} -L ${language} ${options} ${fqName}",
+		Command:     "rm -rf ${genDir} && ${hidl} -R -p . -d ${out}.d -o ${genDir} -L ${language} ${options} ${fqName}",
 		CommandDeps: []string{"${hidl}"},
 		Description: "HIDL ${language}: ${in} => ${out}",
-	}, "depfile", "fqName", "genDir", "language", "options")
+	}, "fqName", "genDir", "language", "options")
 
 	hidlSrcJarRule = pctx.StaticRule("hidlSrcJarRule", blueprint.RuleParams{
-		Depfile: "${depfile}",
+		Depfile: "${out}.d",
 		Deps:    blueprint.DepsGCC,
 		Command: "rm -rf ${genDir} && " +
-			"${hidl} -R -p . -d ${depfile} -o ${genDir}/srcs -L ${language} ${options} ${fqName} && " +
+			"${hidl} -R -p . -d ${out}.d -o ${genDir}/srcs -L ${language} ${options} ${fqName} && " +
 			"${soong_zip} -o ${genDir}/srcs.srcjar -C ${genDir}/srcs -D ${genDir}/srcs",
 		CommandDeps: []string{"${hidl}", "${soong_zip}"},
 		Description: "HIDL ${language}: ${in} => srcs.srcjar",
-	}, "depfile", "fqName", "genDir", "language", "options")
+	}, "fqName", "genDir", "language", "options")
 
 	lintRule = pctx.StaticRule("lintRule", blueprint.RuleParams{
 		Command:     "rm -f ${output} && touch ${output} && ${lint} -j -e -R -p . ${options} ${fqName} > ${output}",
@@ -98,7 +97,7 @@ var (
 func init() {
 	android.RegisterModuleType("prebuilt_hidl_interfaces", prebuiltHidlInterfaceFactory)
 	android.RegisterModuleType("hidl_interface", HidlInterfaceFactory)
-	android.RegisterSingletonType("all_hidl_lints", allHidlLintsFactory)
+	android.RegisterParallelSingletonType("all_hidl_lints", allHidlLintsFactory)
 	android.RegisterModuleType("hidl_interfaces_metadata", hidlInterfacesMetadataSingletonFactory)
 	pctx.Import("android/soong/android")
 }
@@ -317,7 +316,6 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		Output:          g.genOutputs[0],
 		ImplicitOutputs: g.genOutputs[1:],
 		Args: map[string]string{
-			"depfile":  g.genOutputs[0].String() + ".d",
 			"genDir":   g.genOutputDir.String(),
 			"fqName":   g.properties.FqName,
 			"language": g.properties.Language,
@@ -434,7 +432,6 @@ type hidlInterfaceProperties struct {
 
 type hidlInterface struct {
 	android.ModuleBase
-	android.BazelModuleBase
 
 	properties hidlInterfaceProperties
 }
@@ -559,12 +556,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 	mctx.CreateModule(android.FileGroupFactory, &fileGroupProperties{
 		Name: proptools.StringPtr(name.fileGroupName()),
 		Srcs: i.properties.Srcs,
-	},
-		&bazelProperties{
-			&Bazel_module{
-				Bp2build_available: proptools.BoolPtr(false),
-			}},
-	)
+	})
 
 	mctx.CreateModule(hidlGenFactory, &nameProperties{
 		Name: proptools.StringPtr(name.sourcesName()),
@@ -576,6 +568,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 		Inputs:     i.properties.Srcs,
 		Outputs:    concat(wrap(name.dir(), interfaces, "All.cpp"), wrap(name.dir(), types, ".cpp")),
 	})
+
 	mctx.CreateModule(hidlGenFactory, &nameProperties{
 		Name: proptools.StringPtr(name.headersName()),
 	}, &hidlGenProperties{
@@ -618,14 +611,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Export_generated_headers: []string{name.headersName()},
 			Apex_available:           i.properties.Apex_available,
 			Min_sdk_version:          getMinSdkVersion(name.string()),
-		}, &i.properties.VndkProperties,
-			// TODO(b/237810289): We need to disable/enable based on if a module has
-			// been converted or not, otherwise mixed build will fail.
-			&bazelProperties{
-				&Bazel_module{
-					Bp2build_available: proptools.BoolPtr(false),
-				}},
-		)
+		}, &i.properties.VndkProperties)
 	}
 
 	if shouldGenerateJava {
@@ -735,78 +721,8 @@ func HidlInterfaceFactory() android.Module {
 	i.AddProperties(&i.properties)
 	android.InitAndroidModule(i)
 	android.AddLoadHook(i, func(ctx android.LoadHookContext) { hidlInterfaceMutator(ctx, i) })
-	android.InitBazelModule(i)
 
 	return i
-}
-
-type hidlInterfaceAttributes struct {
-	Srcs                bazel.LabelListAttribute
-	Deps                bazel.LabelListAttribute
-	Root                string
-	Root_interface_file bazel.LabelAttribute
-	Min_sdk_version     *string
-	Tags                []string
-}
-
-func (m *hidlInterface) ConvertWithBp2build(ctx android.TopDownMutatorContext) {
-	srcs := bazel.MakeLabelListAttribute(
-		android.BazelLabelForModuleSrc(ctx, m.properties.Srcs))
-
-	// The interface dependencies are added earlier with the suffix of "_interface",
-	// so we need to look for them with the hidlInterfaceSuffix added to the names.
-	// Later we trim the "_interface" suffix. Here is an example:
-	// hidl_interface(
-	//    name = "android.hardware.nfc@1.1",
-	//    deps = [
-	//        "//hardware/interfaces/nfc/1.0:android.hardware.nfc@1.0",
-	//        "//system/libhidl/transport/base/1.0:android.hidl.base@1.0",
-	//    ],
-	// )
-	deps := android.BazelLabelForModuleDeps(ctx, wrap("", m.properties.Interfaces, hidlInterfaceSuffix))
-	var dep_labels []bazel.Label
-	for _, label := range deps.Includes {
-		dep_labels = append(dep_labels,
-			bazel.Label{Label: strings.TrimSuffix(label.Label, hidlInterfaceSuffix)})
-	}
-
-	var root string
-	var root_interface_file bazel.LabelAttribute
-	if module, exists := ctx.ModuleFromName(m.properties.Root); exists {
-		if pkg_root, ok := module.(*hidlPackageRoot); ok {
-			var path string
-			if pkg_root.properties.Path != nil {
-				path = *pkg_root.properties.Path
-			} else {
-				path = ctx.OtherModuleDir(pkg_root)
-			}
-			// The root and root_interface come from the hidl_package_root module that
-			// this module depends on, we don't convert hidl_package_root module
-			// separately since all the other properties of that module are deprecated.
-			root = pkg_root.Name()
-			if path == ctx.ModuleDir() {
-				root_interface_file = *bazel.MakeLabelAttribute(":" + "current.txt")
-			} else {
-				root_interface_file = *bazel.MakeLabelAttribute("//" + path + ":" + "current.txt")
-			}
-		}
-	}
-
-	attrs := &hidlInterfaceAttributes{
-		Srcs:                srcs,
-		Deps:                bazel.MakeLabelListAttribute(bazel.MakeLabelList(dep_labels)),
-		Root:                root,
-		Root_interface_file: root_interface_file,
-		Min_sdk_version:     getMinSdkVersion(m.Name()),
-		Tags:                android.ConvertApexAvailableToTags(m.properties.Apex_available),
-	}
-
-	props := bazel.BazelTargetModuleProperties{
-		Rule_class:        "hidl_interface",
-		Bzl_load_location: "//build/bazel/rules/hidl:hidl_interface.bzl",
-	}
-
-	ctx.CreateBazelTargetModule(props, android.CommonAttributes{Name: strings.TrimSuffix(m.Name(), hidlInterfaceSuffix)}, attrs)
 }
 
 var minSdkVersion = map[string]string{
