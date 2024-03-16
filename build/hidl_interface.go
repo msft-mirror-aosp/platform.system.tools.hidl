@@ -788,6 +788,8 @@ var doubleLoadablePackageNames = []string{
 	"android.hardware.drm@",
 	"android.hardware.graphics.allocator@",
 	"android.hardware.graphics.bufferqueue@",
+	"android.hardware.graphics.common@",
+	"android.hardware.graphics.mapper@",
 	"android.hardware.media@",
 	"android.hardware.media.bufferpool@",
 	"android.hardware.media.c2@",
@@ -795,7 +797,11 @@ var doubleLoadablePackageNames = []string{
 	"android.hardware.memtrack@1.0",
 	"android.hardware.neuralnetworks@",
 	"android.hidl.allocator@",
+	"android.hidl.memory@",
+	"android.hidl.memory.token@",
+	"android.hidl.safe_union@",
 	"android.hidl.token@",
+	"android.hardware.renderscript@",
 	"android.system.suspend@1.0",
 }
 
