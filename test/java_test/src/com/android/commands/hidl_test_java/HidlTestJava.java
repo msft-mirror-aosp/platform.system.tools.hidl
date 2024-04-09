@@ -1097,7 +1097,7 @@ public final class HidlTestJava {
             }
 
             IBase.LotsOfPrimitiveArrays out = proxy.testArrays(in);
-            ExpectTrue(in.equals(out));
+            ExpectDeepEq(in, out);
         }
 
         {
@@ -1430,6 +1430,7 @@ public final class HidlTestJava {
         }
 
         public LotsOfPrimitiveArrays testArrays(LotsOfPrimitiveArrays in) {
+            Log.d(TAG, "tesArrays " + in.toString());
             return in;
         }
 
