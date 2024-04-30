@@ -137,6 +137,17 @@ public final class HidlTestJava {
         ExpectTrue(!x);
     }
 
+    private void ExpectWithin(double a, double b, double precision, String onError) {
+        if (Math.abs(a - b) < precision) {
+            return;
+        }
+        System.err.printf(
+                "Expected '%f' to be within '%f' of '%f'. %s\n", a, precision, b, onError);
+        Log.e(TAG,
+                "Expected '" + a + "' to be within '" + precision + "' of '" + b + "'. " + onError);
+        throw new RuntimeException();
+    }
+
     private void Expect(String result, String s) {
         if (result.equals(s)) {
             return;
@@ -1097,7 +1108,36 @@ public final class HidlTestJava {
             }
 
             IBase.LotsOfPrimitiveArrays out = proxy.testArrays(in);
-            ExpectTrue(in.equals(out));
+
+            final double PRECISION = 0.00001f;
+
+            ExpectDeepEq(in.byte1, out.byte1);
+            ExpectDeepEq(in.byte2, out.byte2);
+            ExpectDeepEq(in.byte3, out.byte3);
+            ExpectDeepEq(in.boolean1, out.boolean1);
+            ExpectDeepEq(in.boolean2, out.boolean2);
+            ExpectDeepEq(in.boolean3, out.boolean3);
+            for (int i = 0; i < 128; ++i) {
+                ExpectWithin(in.double1[i], out.double1[i], PRECISION, String.format("i = %d", i));
+            }
+            for (int i = 0; i < 8; ++i) {
+                for (int j = 0; j < 128; ++j) {
+                    ExpectWithin(in.double2[i][j], out.double2[i][j], PRECISION,
+                            String.format("i = %d, j = %d", i, j));
+                }
+            }
+            for (int i = 0; i < 8; ++i) {
+                for (int j = 0; j < 16; ++j) {
+                    for (int k = 0; k < 128; ++k) {
+                        ExpectWithin(in.double3[i][j][k], out.double3[i][j][k], PRECISION,
+                                String.format("i = %d, j = %d, k = %d", i, j, k));
+                    }
+                }
+            }
+            ExpectDeepEq(in.double1, out.double1);
+            ExpectDeepEq(in.double2, out.double2);
+            ExpectDeepEq(in.double3, out.double3);
+            ExpectDeepEq(in, out);
         }
 
         {
@@ -1430,6 +1470,7 @@ public final class HidlTestJava {
         }
 
         public LotsOfPrimitiveArrays testArrays(LotsOfPrimitiveArrays in) {
+            Log.d(TAG, "tesArrays " + in.toString());
             return in;
         }
 
