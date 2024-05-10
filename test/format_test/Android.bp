@@ -29,9 +29,10 @@ genrule {
     cmd: "$(location hidl-gen) -L format -o $(genDir)/ " +
         "-r hidl_format_test_pkg:system/tools/hidl/test/format_test " +
         "hidl_format_test_pkg@1.0 && " +
-        "cp $$(dirname $(in) | uniq)/Android.bp $(genDir)/system/tools/hidl/test/format_test/1.0 && " +
-        "diff -r -C3 $(genDir)/system/tools/hidl/test/format_test/1.0 $$(dirname $(in) | uniq)",
+        "cp $$(dirname $(location 1.0/IBar.hal) | uniq)/Android.bp $(genDir)/system/tools/hidl/test/format_test/1.0 && " +
+        "diff -r -C3 $(genDir)/system/tools/hidl/test/format_test/1.0 $$(dirname $(location 1.0/IBar.hal) | uniq)",
     srcs: [
+        ":android.hidl.base@1.0_hal",
         "1.0/Android.bp",
         "1.0/IBar.hal",
         "1.0/IFoo.hal",

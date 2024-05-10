@@ -12,7 +12,7 @@ python_test_host {
     main: "hidl_test.py",
     srcs: ["hidl_test.py"],
     test_config: "hidl_test.xml",
-    target_required: [
+    data_device_bins_both: [
         "hidl_test_client",
         "hidl_test_servers",
     ],
@@ -25,6 +25,8 @@ python_test_host {
 cc_defaults {
     name: "hidl_test-defaults",
     defaults: ["hidl-gen-defaults"],
+
+    cpp_std: "gnu++17",
 
     shared_libs: [
         "android.hidl.memory@1.0",

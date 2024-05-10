@@ -298,6 +298,7 @@ void AST::generateInterfaceHeader(Formatter& out) const {
         out << "{ return false; }\n";
 
         for (const auto& tuple : iface->allMethodsFromRoot()) {
+            const Interface* superType = tuple.interface();
             const Method* method = tuple.method();
 
             out << "\n";
@@ -332,6 +333,9 @@ void AST::generateInterfaceHeader(Formatter& out) const {
                     out << " override";
                 }
             } else {
+                if (iface != superType) {
+                    out << " override";
+                }
                 out << " = 0";
             }
             out << ";\n";
@@ -696,7 +700,7 @@ void AST::generateStubHeader(Formatter& out) const {
     // Other hwbinder C++ class hierarchies (namely the one used for Java binder) will still
     // be libhwbinder binders, but they are not instances of BnHwBase.
     if (isIBase()) {
-        out << "bool checkSubclass(const void* subclassID) const;\n";
+        out << "bool checkSubclass(const void* subclassID) const override;\n";
     }
 
     generateMethods(out,
@@ -765,6 +769,7 @@ void AST::generateProxyHeader(Formatter& out) const {
 
     generateCppPackageInclude(out, mPackage, iface->getHwName());
     out << "\n";
+    out << "#include <mutex>\n";
 
     enterLeaveNamespace(out, true /* enter */);
     out << "\n";

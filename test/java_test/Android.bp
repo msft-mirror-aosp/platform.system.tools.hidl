@@ -12,10 +12,6 @@ python_test_host {
     main: "hidl_test_java.py",
     srcs: ["hidl_test_java.py"],
     test_config: "hidl_test_java.xml",
-    target_required: [
-        "hidl_test_java_native",
-        "hidl_test_java_java",
-    ],
     test_suites: [
         "general-tests",
         "vts",
@@ -23,6 +19,10 @@ python_test_host {
     test_options: {
         unit_test: false,
     },
+    data_device_bins_both: ["hidl_test_java_native"],
+    data: [
+        ":hidl_test_java_java",
+    ],
 }
 
 cc_test {
