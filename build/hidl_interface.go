@@ -383,9 +383,6 @@ func prebuiltHidlInterfaceFactory() android.Module {
 }
 
 type hidlInterfaceProperties struct {
-	// Vndk properties for interface library only.
-	cc.VndkProperties
-
 	// List of .hal files which compose this interface.
 	Srcs []string
 
@@ -611,7 +608,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Export_generated_headers: []string{name.headersName()},
 			Apex_available:           i.properties.Apex_available,
 			Min_sdk_version:          getMinSdkVersion(name.string()),
-		}, &i.properties.VndkProperties)
+		})
 	}
 
 	if shouldGenerateJava {
