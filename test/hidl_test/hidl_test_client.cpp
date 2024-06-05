@@ -361,20 +361,26 @@ public:
 
     void getServices() {
         manager = IServiceManager::getService();
-
         // alternatively:
         // manager = defaultServiceManager()
 
         ASSERT_NE(manager, nullptr);
         ASSERT_TRUE(manager->isRemote()); // manager is always remote
 
-        tokenManager = ITokenManager::getService();
-        ASSERT_NE(tokenManager, nullptr);
-        ASSERT_TRUE(tokenManager->isRemote()); // tokenManager is always remote
+        if (IServiceManager::Transport::EMPTY !=
+            manager->getTransport(ITokenManager::descriptor, "default")) {
+            // Token manager only exists on devices before Android V
+            tokenManager = ITokenManager::getService();
+            ASSERT_TRUE(tokenManager);
+            ASSERT_TRUE(tokenManager->isRemote());  // tokenManager is always remote
+        }
 
-        ashmemAllocator = IAllocator::getService("ashmem");
-        ASSERT_NE(ashmemAllocator, nullptr);
-        ASSERT_TRUE(ashmemAllocator->isRemote()); // allocator is always remote
+        if (IServiceManager::Transport::EMPTY !=
+            manager->getTransport(IAllocator::descriptor, "ashmem")) {
+            ashmemAllocator = IAllocator::getService("ashmem");
+            ASSERT_NE(ashmemAllocator, nullptr);
+            ASSERT_TRUE(ashmemAllocator->isRemote());  // allocator is always remote
+        }
 
         // getStub is true if we are in passthrough mode to skip checking
         // binderized server, false for binderized mode.
@@ -871,6 +877,9 @@ TEST_F(HidlTest, InterfacesEqualTest) {
 TEST_F(HidlTest, TestToken) {
     using android::hardware::interfacesEqual;
 
+    if (!tokenManager) {
+        GTEST_SKIP() << "Token manager is not available devices newer than Android U";
+    }
     Return<void> ret = tokenManager->createToken(manager, [&] (const hidl_vec<uint8_t> &token) {
         Return<sp<IBase>> retService = tokenManager->get(token);
         EXPECT_OK(retService);
@@ -893,6 +902,7 @@ TEST_F(HidlTest, TestToken) {
 }
 
 TEST_F(HidlTest, TestSharedMemory) {
+    if (!ashmemAllocator) GTEST_SKIP() << "ashmem allocator is not on the device";
     const uint8_t kValue = 0xCA;
     hidl_memory mem_copy;
     EXPECT_OK(ashmemAllocator->allocate(1024, [&](bool success, const hidl_memory& mem) {
@@ -956,6 +966,7 @@ TEST_F(HidlTest, TestSharedMemory) {
 }
 
 TEST_F(HidlTest, BatchSharedMemory) {
+    if (!ashmemAllocator) GTEST_SKIP() << "ashmem allocator is not on the device";
     const uint8_t kValue = 0xCA;
     const uint64_t kBatchSize = 2;
     hidl_vec<hidl_memory> batchCopy;
@@ -1005,6 +1016,7 @@ TEST_F(HidlTest, BatchSharedMemory) {
 }
 
 TEST_F(HidlTest, MemoryBlock) {
+    if (!ashmemAllocator) GTEST_SKIP() << "ashmem allocator is not on the device";
     const uint8_t kValue = 0xCA;
     using ::android::hardware::IBinder;
     using ::android::hardware::interfacesEqual;
