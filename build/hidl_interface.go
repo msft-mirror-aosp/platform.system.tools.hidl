@@ -163,7 +163,7 @@ func allHidlLintsFactory() android.Singleton {
 }
 
 type allHidlLintsSingleton struct {
-	outPath string
+	outPath android.OutputPath
 }
 
 func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContext) {
@@ -181,7 +181,7 @@ func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContex
 	})
 
 	outPath := android.PathForIntermediates(ctx, "hidl-lint.zip")
-	m.outPath = outPath.String()
+	m.outPath = outPath
 
 	ctx.Build(pctx, android.BuildParams{
 		Rule:   zipLintRule,
@@ -195,7 +195,8 @@ func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContex
 }
 
 func (m *allHidlLintsSingleton) MakeVars(ctx android.MakeVarsContext) {
-	ctx.Strict("ALL_HIDL_LINTS_ZIP", m.outPath)
+	ctx.Strict("ALL_HIDL_LINTS_ZIP", m.outPath.String())
+	ctx.DistForGoal("dist_files", m.outPath)
 }
 
 type hidlGenProperties struct {
