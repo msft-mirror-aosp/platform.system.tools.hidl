@@ -110,11 +110,7 @@ func hidlInterfacesMetadataSingletonFactory() android.Module {
 
 type hidlInterfacesMetadataSingleton struct {
 	android.ModuleBase
-
-	inheritanceHierarchyPath android.OutputPath
 }
-
-var _ android.OutputFileProducer = (*hidlInterfacesMetadataSingleton)(nil)
 
 func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	if m.Name() != hidlMetadataSingletonName {
@@ -137,25 +133,19 @@ func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx androi
 		}
 	})
 
-	m.inheritanceHierarchyPath = android.PathForIntermediates(ctx, "hidl_inheritance_hierarchy.json")
+	inheritanceHierarchyPath := android.PathForIntermediates(ctx, "hidl_inheritance_hierarchy.json")
 
 	ctx.Build(pctx, android.BuildParams{
 		Rule:   joinJsonObjectsToArrayRule,
 		Inputs: inheritanceHierarchyOutputs,
-		Output: m.inheritanceHierarchyPath,
+		Output: inheritanceHierarchyPath,
 		Args: map[string]string{
 			"extras": strings.Join(wrap("{\\\"interface\\\":\\\"", additionalInterfaces, "\\\"},"), " "),
 			"files":  strings.Join(inheritanceHierarchyOutputs.Strings(), " "),
 		},
 	})
-}
 
-func (m *hidlInterfacesMetadataSingleton) OutputFiles(tag string) (android.Paths, error) {
-	if tag != "" {
-		return nil, fmt.Errorf("unsupported tag %q", tag)
-	}
-
-	return android.Paths{m.inheritanceHierarchyPath}, nil
+	ctx.SetOutputFiles(android.Paths{inheritanceHierarchyPath}, "")
 }
 
 func allHidlLintsFactory() android.Singleton {
