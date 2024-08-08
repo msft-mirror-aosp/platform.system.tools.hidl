@@ -111,7 +111,7 @@ std::string getBaseName(const std::string& rawName) {
 template <class NODE>
 static void pushVersionedNodeOntoMap(const NODE& versionedNode,
                                      std::map<std::string, NODE>* latestNodeForBaseName,
-                                     std::vector<const NODE>* supersededNode) {
+                                     std::vector<NODE>* supersededNode) {
     // attempt to push name onto latestNodeForBaseName
     auto [it, inserted] =
             latestNodeForBaseName->emplace(std::move(versionedNode.baseName), versionedNode);
@@ -183,9 +183,9 @@ void AidlHelper::emitAidl(
     out << "interface " << getAidlName(interface.fqName()) << " ";
     out.block([&] {
         std::map<std::string, NodeWithVersion<NamedType>> latestTypeForBaseName;
-        std::vector<const NodeWithVersion<NamedType>> supersededNamedTypes;
+        std::vector<NodeWithVersion<NamedType>> supersededNamedTypes;
         std::map<std::string, NodeWithVersion<Method>> latestMethodForBaseName;
-        std::vector<const NodeWithVersion<Method>> supersededMethods;
+        std::vector<NodeWithVersion<Method>> supersededMethods;
         for (const Interface* iface : interface.typeChain()) {
             if (!AidlHelper::shouldBeExpanded(interface.fqName(), iface->fqName())) {
                 // Stop traversing extended interfaces once they leave this package
