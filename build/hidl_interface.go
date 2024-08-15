@@ -627,6 +627,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Libs:            []string{"hwbinder.stubs"},
 			Apex_available:  i.properties.Apex_available,
 			Min_sdk_version: getMinSdkVersion(name.string()),
+			Is_stubs_module: proptools.BoolPtr(true),
 		}
 
 		mctx.CreateModule(java.LibraryFactory, &javaProperties{
@@ -657,6 +658,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Srcs:            []string{":" + name.javaConstantsSourcesName()},
 			Apex_available:  i.properties.Apex_available,
 			Min_sdk_version: getMinSdkVersion(name.string()),
+			Is_stubs_module: proptools.BoolPtr(true),
 		})
 	}
 
