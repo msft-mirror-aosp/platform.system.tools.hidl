@@ -110,11 +110,7 @@ func hidlInterfacesMetadataSingletonFactory() android.Module {
 
 type hidlInterfacesMetadataSingleton struct {
 	android.ModuleBase
-
-	inheritanceHierarchyPath android.OutputPath
 }
-
-var _ android.OutputFileProducer = (*hidlInterfacesMetadataSingleton)(nil)
 
 func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	if m.Name() != hidlMetadataSingletonName {
@@ -137,25 +133,19 @@ func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx androi
 		}
 	})
 
-	m.inheritanceHierarchyPath = android.PathForIntermediates(ctx, "hidl_inheritance_hierarchy.json")
+	inheritanceHierarchyPath := android.PathForIntermediates(ctx, "hidl_inheritance_hierarchy.json")
 
 	ctx.Build(pctx, android.BuildParams{
 		Rule:   joinJsonObjectsToArrayRule,
 		Inputs: inheritanceHierarchyOutputs,
-		Output: m.inheritanceHierarchyPath,
+		Output: inheritanceHierarchyPath,
 		Args: map[string]string{
 			"extras": strings.Join(wrap("{\\\"interface\\\":\\\"", additionalInterfaces, "\\\"},"), " "),
 			"files":  strings.Join(inheritanceHierarchyOutputs.Strings(), " "),
 		},
 	})
-}
 
-func (m *hidlInterfacesMetadataSingleton) OutputFiles(tag string) (android.Paths, error) {
-	if tag != "" {
-		return nil, fmt.Errorf("unsupported tag %q", tag)
-	}
-
-	return android.Paths{m.inheritanceHierarchyPath}, nil
+	ctx.SetOutputFiles(android.Paths{inheritanceHierarchyPath}, "")
 }
 
 func allHidlLintsFactory() android.Singleton {
@@ -163,7 +153,7 @@ func allHidlLintsFactory() android.Singleton {
 }
 
 type allHidlLintsSingleton struct {
-	outPath string
+	outPath android.OutputPath
 }
 
 func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContext) {
@@ -181,7 +171,7 @@ func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContex
 	})
 
 	outPath := android.PathForIntermediates(ctx, "hidl-lint.zip")
-	m.outPath = outPath.String()
+	m.outPath = outPath
 
 	ctx.Build(pctx, android.BuildParams{
 		Rule:   zipLintRule,
@@ -195,7 +185,8 @@ func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContex
 }
 
 func (m *allHidlLintsSingleton) MakeVars(ctx android.MakeVarsContext) {
-	ctx.Strict("ALL_HIDL_LINTS_ZIP", m.outPath)
+	ctx.Strict("ALL_HIDL_LINTS_ZIP", m.outPath.String())
+	ctx.DistForGoal("dist_files", m.outPath)
 }
 
 type hidlGenProperties struct {
@@ -383,9 +374,6 @@ func prebuiltHidlInterfaceFactory() android.Module {
 }
 
 type hidlInterfaceProperties struct {
-	// Vndk properties for interface library only.
-	cc.VndkProperties
-
 	// List of .hal files which compose this interface.
 	Srcs []string
 
@@ -611,7 +599,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Export_generated_headers: []string{name.headersName()},
 			Apex_available:           i.properties.Apex_available,
 			Min_sdk_version:          getMinSdkVersion(name.string()),
-		}, &i.properties.VndkProperties)
+		})
 	}
 
 	if shouldGenerateJava {
@@ -639,6 +627,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Libs:            []string{"hwbinder.stubs"},
 			Apex_available:  i.properties.Apex_available,
 			Min_sdk_version: getMinSdkVersion(name.string()),
+			Is_stubs_module: proptools.BoolPtr(true),
 		}
 
 		mctx.CreateModule(java.LibraryFactory, &javaProperties{
@@ -669,6 +658,7 @@ This corresponds to the "-r%s:<some path>" option that would be passed into hidl
 			Srcs:            []string{":" + name.javaConstantsSourcesName()},
 			Apex_available:  i.properties.Apex_available,
 			Min_sdk_version: getMinSdkVersion(name.string()),
+			Is_stubs_module: proptools.BoolPtr(true),
 		})
 	}
 
