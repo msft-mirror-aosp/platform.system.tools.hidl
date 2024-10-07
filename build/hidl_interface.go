@@ -98,18 +98,20 @@ func init() {
 	android.RegisterModuleType("prebuilt_hidl_interfaces", prebuiltHidlInterfaceFactory)
 	android.RegisterModuleType("hidl_interface", HidlInterfaceFactory)
 	android.RegisterParallelSingletonType("all_hidl_lints", allHidlLintsFactory)
-	android.RegisterModuleType("hidl_interfaces_metadata", hidlInterfacesMetadataSingletonFactory)
+	android.InitRegistrationContext.RegisterSingletonModuleType("hidl_interfaces_metadata", hidlInterfacesMetadataSingletonFactory)
 	pctx.Import("android/soong/android")
 }
 
-func hidlInterfacesMetadataSingletonFactory() android.Module {
+func hidlInterfacesMetadataSingletonFactory() android.SingletonModule {
 	i := &hidlInterfacesMetadataSingleton{}
 	android.InitAndroidModule(i)
 	return i
 }
 
 type hidlInterfacesMetadataSingleton struct {
-	android.ModuleBase
+	android.SingletonModuleBase
+
+	inheritanceHierarchyPath android.WritablePath
 }
 
 func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx android.ModuleContext) {
@@ -118,9 +120,15 @@ func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx androi
 		return
 	}
 
+	// The rule to build the output file will be defined in GenerateSingletonBuildActions
+	m.inheritanceHierarchyPath = android.PathForModuleOut(ctx, "hidl_inheritance_hierarchy.json")
+	ctx.SetOutputFiles(android.Paths{m.inheritanceHierarchyPath}, "")
+}
+
+func (m *hidlInterfacesMetadataSingleton) GenerateSingletonBuildActions(ctx android.SingletonContext) {
 	var inheritanceHierarchyOutputs android.Paths
-	additionalInterfaces := []string{}
-	ctx.VisitDirectDeps(func(m android.Module) {
+	var additionalInterfaces []string
+	ctx.VisitAllModules(func(m android.Module) {
 		if !m.ExportedToMake() {
 			return
 		}
@@ -133,19 +141,15 @@ func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx androi
 		}
 	})
 
-	inheritanceHierarchyPath := android.PathForIntermediates(ctx, "hidl_inheritance_hierarchy.json")
-
 	ctx.Build(pctx, android.BuildParams{
 		Rule:   joinJsonObjectsToArrayRule,
 		Inputs: inheritanceHierarchyOutputs,
-		Output: inheritanceHierarchyPath,
+		Output: m.inheritanceHierarchyPath,
 		Args: map[string]string{
 			"extras": strings.Join(wrap("{\\\"interface\\\":\\\"", additionalInterfaces, "\\\"},"), " "),
 			"files":  strings.Join(inheritanceHierarchyOutputs.Strings(), " "),
 		},
 	})
-
-	ctx.SetOutputFiles(android.Paths{inheritanceHierarchyPath}, "")
 }
 
 func allHidlLintsFactory() android.Singleton {
@@ -185,7 +189,6 @@ func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContex
 }
 
 func (m *allHidlLintsSingleton) MakeVars(ctx android.MakeVarsContext) {
-	ctx.Strict("ALL_HIDL_LINTS_ZIP", m.outPath.String())
 	ctx.DistForGoal("dist_files", m.outPath)
 }
 
@@ -335,8 +338,6 @@ func (g *hidlGenRule) DepsMutator(ctx android.BottomUpMutatorContext) {
 	ctx.AddDependency(ctx.Module(), nil, g.properties.FqName+hidlInterfaceSuffix)
 	ctx.AddDependency(ctx.Module(), nil, wrap("", g.properties.Interfaces, hidlInterfaceSuffix)...)
 	ctx.AddDependency(ctx.Module(), nil, g.properties.Root)
-
-	ctx.AddReverseDependency(ctx.Module(), nil, hidlMetadataSingletonName)
 }
 
 func hidlGenFactory() android.Module {
@@ -361,10 +362,6 @@ type prebuiltHidlInterface struct {
 }
 
 func (p *prebuiltHidlInterface) GenerateAndroidBuildActions(ctx android.ModuleContext) {}
-
-func (p *prebuiltHidlInterface) DepsMutator(ctx android.BottomUpMutatorContext) {
-	ctx.AddReverseDependency(ctx.Module(), nil, hidlMetadataSingletonName)
-}
 
 func prebuiltHidlInterfaceFactory() android.Module {
 	i := &prebuiltHidlInterface{}
