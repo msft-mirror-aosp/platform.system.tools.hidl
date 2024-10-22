@@ -20,7 +20,7 @@ python_test_host {
         unit_test: false,
     },
     data_device_bins_both: ["hidl_test_java_native"],
-    data: [
+    device_common_data: [
         ":hidl_test_java_java",
     ],
 }
