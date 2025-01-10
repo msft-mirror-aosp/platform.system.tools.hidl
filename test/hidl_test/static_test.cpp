@@ -144,8 +144,7 @@ static_assert(IExpression::UInt64BitShifting::uint64BitShift1 == 1LL << 63, "1l 
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconstant-logical-operand"
-#pragma clang diagnostic ignored "-Wlogical-op-parentheses"
-#pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
+#pragma clang diagnostic ignored "-Wparentheses"
 
 static_assert(IExpression::Precedence::literal == (4), "");
 static_assert(IExpression::Precedence::neg == (-4), "");
