@@ -487,7 +487,7 @@ std::string ConstantExpression::rawValue(ScalarType::Kind castKind) const {
 
 #define CASE_STR(__type__) return std::to_string(this->cast<__type__>());
 
-    SWITCH_KIND(castKind, CASE_STR, SHOULD_NOT_REACH(); return nullptr; );
+    SWITCH_KIND(castKind, CASE_STR, SHOULD_NOT_REACH(); return ""; );
 }
 
 template<typename T>
