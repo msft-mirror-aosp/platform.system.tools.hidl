@@ -182,11 +182,12 @@ func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContex
 			"files":  strings.Join(hidlLintOutputs.Strings(), " "),
 		},
 	})
+
+	ctx.DistForGoal("dist_files", outPath)
 }
 
 func (m *allHidlLintsSingleton) MakeVars(ctx android.MakeVarsContext) {
 	ctx.Strict("ALL_HIDL_LINTS_ZIP", m.outPath.String())
-	ctx.DistForGoal("dist_files", m.outPath)
 }
 
 type hidlGenProperties struct {
