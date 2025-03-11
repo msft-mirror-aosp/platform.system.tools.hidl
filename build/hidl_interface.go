@@ -10,7 +10,7 @@
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
-// limitations under the License.
+// limitations under the License.f
 
 package hidl
 
@@ -158,11 +158,11 @@ type allHidlLintsSingleton struct {
 
 func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContext) {
 	var hidlLintOutputs android.Paths
-	ctx.VisitAllModules(func(m android.Module) {
-		if t, ok := m.(*hidlGenRule); ok {
-			if t.properties.Language == "lint" {
-				if len(t.genOutputs) == 1 {
-					hidlLintOutputs = append(hidlLintOutputs, t.genOutputs[0])
+	ctx.VisitAllModuleProxies(func(m android.ModuleProxy) {
+		if t, ok := android.OtherModuleProvider(ctx, m, HidlGenRuleInfoProvider); ok {
+			if t.Language == "lint" {
+				if len(t.GenOutputs) == 1 {
+					hidlLintOutputs = append(hidlLintOutputs, t.GenOutputs[0])
 				} else {
 					panic("-hidl-lint target was not configured correctly")
 				}
@@ -182,11 +182,12 @@ func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContex
 			"files":  strings.Join(hidlLintOutputs.Strings(), " "),
 		},
 	})
+
+	ctx.DistForGoal("dist_files", outPath)
 }
 
 func (m *allHidlLintsSingleton) MakeVars(ctx android.MakeVarsContext) {
 	ctx.Strict("ALL_HIDL_LINTS_ZIP", m.outPath.String())
-	ctx.DistForGoal("dist_files", m.outPath)
 }
 
 type hidlGenProperties struct {
@@ -208,6 +209,13 @@ type hidlGenRule struct {
 	genInputs    android.Paths
 	genOutputs   android.WritablePaths
 }
+
+type HidlGenRuleInfo struct {
+	Language   string
+	GenOutputs android.WritablePaths
+}
+
+var HidlGenRuleInfoProvider = blueprint.NewProvider[HidlGenRuleInfo]()
 
 var _ android.SourceFileProducer = (*hidlGenRule)(nil)
 var _ genrule.SourceFileGenerator = (*hidlGenRule)(nil)
@@ -269,6 +277,11 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	if g.properties.Language == "java" {
 		rule = hidlSrcJarRule
 	}
+
+	android.SetProvider(ctx, HidlGenRuleInfoProvider, HidlGenRuleInfo{
+		Language:   g.properties.Language,
+		GenOutputs: g.genOutputs,
+	})
 
 	if g.properties.Language == "lint" {
 		ctx.Build(pctx, android.BuildParams{
