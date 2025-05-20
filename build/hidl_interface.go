@@ -314,7 +314,7 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		return
 	}
 
-	ctx.ModuleBuild(pctx, android.ModuleBuildParams{
+	ctx.Build(pctx, android.BuildParams{
 		Rule:            rule,
 		Inputs:          inputs,
 		Output:          g.genOutputs[0],
