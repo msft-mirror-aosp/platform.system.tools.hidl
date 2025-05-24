@@ -79,7 +79,7 @@ func (r *hidlPackageRoot) generateCurrentFile(ctx android.ModuleContext) {
 	output := android.PathForModuleGen(ctx, r.Name()+".txt")
 	r.genOutputs = append(r.genOutputs, output)
 
-	ctx.ModuleBuild(pctx, android.ModuleBuildParams{
+	ctx.Build(pctx, android.BuildParams{
 		Rule:   currentTxtRule,
 		Input:  r.currentPath.Path(),
 		Output: output,
