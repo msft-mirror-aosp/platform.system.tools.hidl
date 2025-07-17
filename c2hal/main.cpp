@@ -18,11 +18,12 @@
 
 #include <android-base/logging.h>
 #include <android-base/macros.h>
-#include <set>
-#include <map>
 #include <stdio.h>
-#include <string>
 #include <unistd.h>
+#include <algorithm>
+#include <map>
+#include <set>
+#include <string>
 #include <vector>
 
 using namespace android;
