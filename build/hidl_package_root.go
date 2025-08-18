@@ -59,17 +59,13 @@ type hidlPackageRoot struct {
 
 var _ android.SourceFileProducer = (*hidlPackageRoot)(nil)
 
-func (r *hidlPackageRoot) getFullPackageRoot() string {
-	return "-r" + r.Name() + ":" + *r.properties.Path
+type PackageRootInfo struct {
+	FullPackageRoot string
+	CurrentPath     android.OptionalPath
+	RequireFrozen   bool
 }
 
-func (r *hidlPackageRoot) getCurrentPath() android.OptionalPath {
-	return r.currentPath
-}
-
-func (r *hidlPackageRoot) requireFrozen() bool {
-	return proptools.BoolDefault(r.properties.Require_frozen, false)
-}
+var PackageRootInfoProvider = blueprint.NewProvider[PackageRootInfo]()
 
 func (r *hidlPackageRoot) generateCurrentFile(ctx android.ModuleContext) {
 	if !r.currentPath.Valid() {
@@ -113,6 +109,12 @@ func (r *hidlPackageRoot) GenerateAndroidBuildActions(ctx android.ModuleContext)
 	}
 
 	r.generateCurrentFile(ctx)
+
+	android.SetProvider(ctx, PackageRootInfoProvider, PackageRootInfo{
+		FullPackageRoot: "-r" + r.Name() + ":" + *r.properties.Path,
+		CurrentPath:     r.currentPath,
+		RequireFrozen:   proptools.Bool(r.properties.Require_frozen),
+	})
 }
 
 func (r *hidlPackageRoot) DepsMutator(ctx android.BottomUpMutatorContext) {
