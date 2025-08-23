@@ -120,16 +120,20 @@ func (m *hidlInterfacesMetadataSingleton) GenerateAndroidBuildActions(ctx androi
 
 	var inheritanceHierarchyOutputs android.Paths
 	additionalInterfaces := []string{}
-	ctx.VisitDirectDeps(func(m android.Module) {
-		if !m.ExportedToMake() {
-			return
-		}
-		if t, ok := m.(*hidlGenRule); ok {
-			if t.properties.Language == "inheritance-hierarchy" {
-				inheritanceHierarchyOutputs = append(inheritanceHierarchyOutputs, t.genOutputs.Paths()...)
+	ctx.VisitDirectDepsProxy(func(m android.ModuleProxy) {
+
+		if info, ok := android.OtherModuleProvider(ctx, m, android.CommonModuleInfoProvider); ok {
+			if !info.ExportedToMake {
+				return
 			}
-		} else if t, ok := m.(*prebuiltHidlInterface); ok {
-			additionalInterfaces = append(additionalInterfaces, t.properties.Interfaces...)
+		}
+
+		if info, ok := android.OtherModuleProvider(ctx, m, GenRuleInfoProvider); ok {
+			if info.Language == "inheritance-hierarchy" {
+				inheritanceHierarchyOutputs = append(inheritanceHierarchyOutputs, info.GenOutputs...)
+			}
+		} else if info, ok := android.OtherModuleProvider(ctx, m, PrebuiltInterfaceInfoProvider); ok {
+			additionalInterfaces = append(additionalInterfaces, info.Interfaces...)
 		}
 	})
 
@@ -159,7 +163,7 @@ type allHidlLintsSingleton struct {
 func (m *allHidlLintsSingleton) GenerateBuildActions(ctx android.SingletonContext) {
 	var hidlLintOutputs android.Paths
 	ctx.VisitAllModuleProxies(func(m android.ModuleProxy) {
-		if t, ok := android.OtherModuleProvider(ctx, m, HidlGenRuleInfoProvider); ok {
+		if t, ok := android.OtherModuleProvider(ctx, m, GenRuleInfoProvider); ok {
 			if t.Language == "lint" {
 				if len(t.GenOutputs) == 1 {
 					hidlLintOutputs = append(hidlLintOutputs, t.GenOutputs[0])
@@ -210,12 +214,12 @@ type hidlGenRule struct {
 	genOutputs   android.WritablePaths
 }
 
-type HidlGenRuleInfo struct {
+type GenRuleInfo struct {
 	Language   string
-	GenOutputs android.WritablePaths
+	GenOutputs android.Paths
 }
 
-var HidlGenRuleInfoProvider = blueprint.NewProvider[HidlGenRuleInfo]()
+var GenRuleInfoProvider = blueprint.NewProvider[GenRuleInfo]()
 
 var _ android.SourceFileProducer = (*hidlGenRule)(nil)
 var _ genrule.SourceFileGenerator = (*hidlGenRule)(nil)
@@ -249,20 +253,21 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 
 	var extraOptions []string // including roots
 	var currentPath android.OptionalPath
-	ctx.VisitDirectDeps(func(dep android.Module) {
-		switch t := dep.(type) {
-		case *hidlInterface:
-			extraOptions = append(extraOptions, t.properties.Full_root_option)
-		case *hidlPackageRoot:
+	ctx.VisitDirectDepsProxy(func(dep android.ModuleProxy) {
+		if info, ok := android.OtherModuleProvider(ctx, dep, InterfaceInfoProvider); ok {
+			extraOptions = append(extraOptions, info.FullRootOption)
+		}
+		if info, ok := android.OtherModuleProvider(ctx, dep, PackageRootInfoProvider); ok {
 			if currentPath.Valid() {
-				panic(fmt.Sprintf("Expecting only one path, but found %v %v", currentPath, t.getCurrentPath()))
+				panic(fmt.Sprintf("Expecting only one path, but found %v %v", currentPath, info.CurrentPath))
 			}
 
-			currentPath = t.getCurrentPath()
+			currentPath = info.CurrentPath
 
-			if t.requireFrozen() {
+			if info.RequireFrozen {
 				extraOptions = append(extraOptions, "-F")
 			}
+
 		}
 	})
 
@@ -278,9 +283,9 @@ func (g *hidlGenRule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		rule = hidlSrcJarRule
 	}
 
-	android.SetProvider(ctx, HidlGenRuleInfoProvider, HidlGenRuleInfo{
+	android.SetProvider(ctx, GenRuleInfoProvider, GenRuleInfo{
 		Language:   g.properties.Language,
-		GenOutputs: g.genOutputs,
+		GenOutputs: g.genOutputs.Paths(),
 	})
 
 	if g.properties.Language == "lint" {
@@ -373,7 +378,17 @@ type prebuiltHidlInterface struct {
 	properties prebuiltHidlInterfaceProperties
 }
 
-func (p *prebuiltHidlInterface) GenerateAndroidBuildActions(ctx android.ModuleContext) {}
+type PrebuiltInterfaceInfo struct {
+	Interfaces []string
+}
+
+var PrebuiltInterfaceInfoProvider = blueprint.NewProvider[PrebuiltInterfaceInfo]()
+
+func (p *prebuiltHidlInterface) GenerateAndroidBuildActions(ctx android.ModuleContext) {
+	android.SetProvider(ctx, PrebuiltInterfaceInfoProvider, PrebuiltInterfaceInfo{
+		Interfaces: p.properties.Interfaces,
+	})
+}
 
 func (p *prebuiltHidlInterface) DepsMutator(ctx android.BottomUpMutatorContext) {
 	ctx.AddReverseDependency(ctx.Module(), nil, hidlMetadataSingletonName)
@@ -410,9 +425,6 @@ type hidlInterfaceProperties struct {
 	// Whether to generate VTS-related testing libraries.
 	Gen_vts *bool
 
-	// example: -randroid.hardware:hardware/interfaces
-	Full_root_option string `blueprint:"mutated"`
-
 	// List of APEX modules this interface can be used in.
 	//
 	// WARNING: HIDL is not fully supported in APEX since VINTF currently doesn't
@@ -436,6 +448,12 @@ type hidlInterface struct {
 
 	properties hidlInterfaceProperties
 }
+
+type InterfaceInfo struct {
+	FullRootOption string
+}
+
+var InterfaceInfoProvider = blueprint.NewProvider[InterfaceInfo]()
 
 func processSources(mctx android.LoadHookContext, srcs []string) ([]string, []string, bool) {
 	var interfaces []string
@@ -701,19 +719,23 @@ func (h *hidlInterface) Name() string {
 }
 func (h *hidlInterface) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	visited := false
-	ctx.VisitDirectDeps(func(dep android.Module) {
-		if r, ok := dep.(*hidlPackageRoot); ok {
+	fullRootOption := ""
+	ctx.VisitDirectDepsProxy(func(dep android.ModuleProxy) {
+		if info, ok := android.OtherModuleProvider(ctx, dep, PackageRootInfoProvider); ok {
 			if visited {
 				panic("internal error, multiple dependencies found but only one added")
 			}
 			visited = true
-			h.properties.Full_root_option = r.getFullPackageRoot()
+			fullRootOption = info.FullPackageRoot
 		}
 	})
 	if !visited {
 		panic("internal error, no dependencies found but dependency added")
 	}
 
+	android.SetProvider(ctx, InterfaceInfoProvider, InterfaceInfo{
+		FullRootOption: fullRootOption,
+	})
 }
 func (h *hidlInterface) DepsMutator(ctx android.BottomUpMutatorContext) {
 	ctx.AddDependency(ctx.Module(), nil, h.properties.Root)
