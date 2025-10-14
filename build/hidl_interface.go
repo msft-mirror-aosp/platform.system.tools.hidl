@@ -27,6 +27,8 @@ import (
 	"android/soong/java"
 )
 
+//go:generate go run ../../../../build/blueprint/gobtools/codegen/gob_gen.go
+
 var (
 	hidlInterfaceSuffix       = "_interface"
 	hidlMetadataSingletonName = "hidl_metadata_json"
@@ -214,6 +216,7 @@ type hidlGenRule struct {
 	genOutputs   android.WritablePaths
 }
 
+// @auto-generate: gob
 type GenRuleInfo struct {
 	Language   string
 	GenOutputs android.Paths
@@ -378,6 +381,7 @@ type prebuiltHidlInterface struct {
 	properties prebuiltHidlInterfaceProperties
 }
 
+// @auto-generate: gob
 type PrebuiltInterfaceInfo struct {
 	Interfaces []string
 }
@@ -449,6 +453,7 @@ type hidlInterface struct {
 	properties hidlInterfaceProperties
 }
 
+// @auto-generate: gob
 type InterfaceInfo struct {
 	FullRootOption string
 }

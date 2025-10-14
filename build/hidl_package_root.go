@@ -23,6 +23,8 @@ import (
 	"android/soong/android"
 )
 
+//go:generate go run ../../../../build/blueprint/gobtools/codegen/gob_gen.go
+
 var (
 	currentTxtRule = pctx.StaticRule("currentTxtRule", blueprint.RuleParams{
 		Command:     "cp -f ${in} ${output}",
@@ -59,6 +61,7 @@ type hidlPackageRoot struct {
 
 var _ android.SourceFileProducer = (*hidlPackageRoot)(nil)
 
+// @auto-generate: gob
 type PackageRootInfo struct {
 	FullPackageRoot string
 	CurrentPath     android.OptionalPath
