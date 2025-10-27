@@ -41,11 +41,12 @@ var (
 	intermediatesDir = pctx.IntermediatesPathVariable("intermediatesDir", "")
 
 	hidlRule = pctx.StaticRule("hidlRule", blueprint.RuleParams{
-		Depfile:     "${out}.d",
-		Deps:        blueprint.DepsGCC,
-		Command:     "rm -rf ${genDir} && ${hidl} -R -p . -d ${out}.d -o ${genDir} -L ${language} ${options} ${fqName}",
-		CommandDeps: []string{"${hidl}"},
-		Description: "HIDL ${language}: ${in} => ${out}",
+		Depfile:         "${out}.d",
+		Deps:            blueprint.DepsGCC,
+		Command:         "rm -rf ${genDir} && ${hidl} -R -p . -d ${out}.d -o ${genDir} -L ${language} ${options} ${fqName}",
+		CommandDeps:     []string{"${hidl}"},
+		Description:     "HIDL ${language}: ${in} => ${out}",
+		SandboxDisabled: true,
 	}, "fqName", "genDir", "language", "options")
 
 	hidlSrcJarRule = pctx.StaticRule("hidlSrcJarRule", blueprint.RuleParams{
@@ -54,28 +55,32 @@ var (
 		Command: "rm -rf ${genDir} && " +
 			"${hidl} -R -p . -d ${out}.d -o ${genDir}/srcs -L ${language} ${options} ${fqName} && " +
 			"${soong_zip} -o ${genDir}/srcs.srcjar -C ${genDir}/srcs -D ${genDir}/srcs",
-		CommandDeps: []string{"${hidl}", "${soong_zip}"},
-		Description: "HIDL ${language}: ${in} => srcs.srcjar",
+		CommandDeps:     []string{"${hidl}", "${soong_zip}"},
+		Description:     "HIDL ${language}: ${in} => srcs.srcjar",
+		SandboxDisabled: true,
 	}, "fqName", "genDir", "language", "options")
 
 	lintRule = pctx.StaticRule("lintRule", blueprint.RuleParams{
-		Command:     "rm -f ${output} && touch ${output} && ${lint} -j -e -R -p . ${options} ${fqName} > ${output}",
-		CommandDeps: []string{"${lint}"},
-		Description: "hidl-lint ${fqName}: ${out}",
+		Command:         "rm -f ${output} && touch ${output} && ${lint} -j -e -R -p . ${options} ${fqName} > ${output}",
+		CommandDeps:     []string{"${lint}"},
+		Description:     "hidl-lint ${fqName}: ${out}",
+		SandboxDisabled: true,
 	}, "output", "options", "fqName")
 
 	zipLintRule = pctx.StaticRule("zipLintRule", blueprint.RuleParams{
-		Rspfile:        "$out.rsp",
-		RspfileContent: "$files",
-		Command:        "rm -f ${output} && ${soong_zip} -o ${output} -C ${intermediatesDir} -l ${out}.rsp",
-		CommandDeps:    []string{"${soong_zip}"},
-		Description:    "Zipping hidl-lints into ${output}",
+		Rspfile:         "$out.rsp",
+		RspfileContent:  "$files",
+		Command:         "rm -f ${output} && ${soong_zip} -o ${output} -C ${intermediatesDir} -l ${out}.rsp",
+		CommandDeps:     []string{"${soong_zip}"},
+		Description:     "Zipping hidl-lints into ${output}",
+		SandboxDisabled: true,
 	}, "output", "files")
 
 	inheritanceHierarchyRule = pctx.StaticRule("inheritanceHierarchyRule", blueprint.RuleParams{
-		Command:     "rm -f ${out} && ${hidl} -L inheritance-hierarchy ${options} ${fqInterface} > ${out}",
-		CommandDeps: []string{"${hidl}"},
-		Description: "HIDL inheritance hierarchy: ${fqInterface} => ${out}",
+		Command:         "rm -f ${out} && ${hidl} -L inheritance-hierarchy ${options} ${fqInterface} > ${out}",
+		CommandDeps:     []string{"${hidl}"},
+		Description:     "HIDL inheritance hierarchy: ${fqInterface} => ${out}",
+		SandboxDisabled: true,
 	}, "options", "fqInterface")
 
 	joinJsonObjectsToArrayRule = pctx.StaticRule("joinJsonObjectsToArrayRule", blueprint.RuleParams{
@@ -92,7 +97,8 @@ var (
 			"done && " +
 			// Remove the last comma, replacing it with the closing bracket.
 			"sed -i '$$d' ${out} && echo ']' >> ${out}",
-		Description: "Joining JSON objects into array ${out}",
+		Description:     "Joining JSON objects into array ${out}",
+		SandboxDisabled: true,
 	}, "extras", "files")
 )
 

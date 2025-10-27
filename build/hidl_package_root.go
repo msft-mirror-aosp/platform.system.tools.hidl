@@ -27,8 +27,9 @@ import (
 
 var (
 	currentTxtRule = pctx.StaticRule("currentTxtRule", blueprint.RuleParams{
-		Command:     "cp -f ${in} ${output}",
-		Description: "copy current.txt: ${in} => ${output}",
+		Command:         "cp -f ${in} ${output}",
+		Description:     "copy current.txt: ${in} => ${output}",
+		SandboxDisabled: true,
 	}, "output")
 )
 
