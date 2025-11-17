@@ -5,7 +5,10 @@ package hidl
 import (
 	"android/soong/android"
 	"bytes"
+	"fmt"
 	"github.com/google/blueprint/gobtools"
+	"github.com/google/blueprint/proptools"
+	"reflect"
 )
 
 // begin of hidl_interface.go
@@ -37,6 +40,44 @@ func (r GenRuleInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		}
 	}
 	return err
+}
+
+func (r GenRuleInfo) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":hidl.GenRuleInfo")
+	hasher.WriteInt(2)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Language)
+	hasher.WriteString(":hidl.android.Paths")
+	hasher.WriteString(":.[]Path")
+	hasher.WriteInt(len(r.GenOutputs))
+	for val1 := 0; val1 < len(r.GenOutputs); val1++ {
+		hasher.WriteString("android/soong/android:android.Path")
+		val2 := r.GenOutputs[val1] == nil
+		if val2 {
+			hasher.WriteByte(0)
+		} else {
+			if v := reflect.ValueOf(r.GenOutputs[val1]); v.Kind() == reflect.Ptr {
+				if v.IsNil() {
+					panic(fmt.Errorf("nil pointer is not supported in interface"))
+				} else {
+					val3 := r.GenOutputs[val1] == nil
+					if val3 {
+						hasher.WriteByte(0)
+					} else {
+						val4 := func(hasher *proptools.Hasher) error {
+							return r.GenOutputs[val1].(proptools.CustomHash).CustomHash(hasher)
+						}
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val4); err != nil {
+							return err
+						}
+					}
+				}
+			} else {
+				r.GenOutputs[val1].(proptools.CustomHash).CustomHash(hasher)
+			}
+		}
+	}
+	return nil
 }
 
 func (r *GenRuleInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
@@ -94,6 +135,18 @@ func (r PrebuiltInterfaceInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer
 	return err
 }
 
+func (r PrebuiltInterfaceInfo) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":hidl.PrebuiltInterfaceInfo")
+	hasher.WriteInt(1)
+	hasher.WriteString(":.[]string")
+	hasher.WriteInt(len(r.Interfaces))
+	for val1 := 0; val1 < len(r.Interfaces); val1++ {
+		hasher.WriteString(":.string")
+		hasher.WriteString(r.Interfaces[val1])
+	}
+	return nil
+}
+
 func (r *PrebuiltInterfaceInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 	var err error
 
@@ -128,6 +181,14 @@ func (r InterfaceInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error 
 		return err
 	}
 	return err
+}
+
+func (r InterfaceInfo) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":hidl.InterfaceInfo")
+	hasher.WriteInt(1)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.FullRootOption)
+	return nil
 }
 
 func (r *InterfaceInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
@@ -169,6 +230,23 @@ func (r PackageRootInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) erro
 		return err
 	}
 	return err
+}
+
+func (r PackageRootInfo) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":hidl.PackageRootInfo")
+	hasher.WriteInt(3)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.FullPackageRoot)
+	if err := r.CurrentPath.CustomHash(hasher); err != nil {
+		return err
+	}
+	hasher.WriteString(":.bool")
+	if r.RequireFrozen {
+		hasher.WriteByte(1)
+	} else {
+		hasher.WriteByte(0)
+	}
+	return nil
 }
 
 func (r *PackageRootInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
