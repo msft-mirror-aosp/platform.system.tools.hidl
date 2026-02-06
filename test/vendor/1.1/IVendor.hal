@@ -18,10 +18,6 @@ package hidl.tests.vendor@1.1;
 
 import hidl.tests.vendor@1.0::IVendor;
 
-// this import is unused, but it should still show up in the
-// associated Android.bp
-import android.frameworks.displayservice@1.0;
-
 interface IVendor extends @1.0::IVendor {
     safe_union Test {
         int64_t foo;
