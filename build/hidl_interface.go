@@ -898,6 +898,7 @@ var allAospHidlInterfaces = map[string]bool{
 	"android.frameworks.cameraservice.service@2.0": true,
 	"android.frameworks.cameraservice.service@2.1": true,
 	"android.frameworks.cameraservice.service@2.2": true,
+	"android.frameworks.displayservice@1.0":        true,
 	"android.frameworks.sensorservice@1.0":         true,
 	"android.frameworks.stats@1.0":                 true,
 	"android.frameworks.vr.composer@1.0":           true,
