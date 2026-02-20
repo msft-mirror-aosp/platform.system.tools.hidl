@@ -19,7 +19,6 @@ hidl_interface {
         "types.hal",
     ],
     interfaces: [
-        "android.frameworks.displayservice@1.0",
         "android.hardware.tests.baz@1.0",
         "android.hidl.base@1.0",
         "hidl.tests.vendor@1.0",
